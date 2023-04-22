@@ -31,12 +31,9 @@ async fn health_check_works() {
 /// if we fail to perform the required setup we can just panic and crash
 /// all the things.
 fn spawn_app() -> String {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .expect("Failed to bind random port");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     // We retrieve the port assigned to us by the OS
-    let port = listener.local_addr()
-        .expect("Failed to get address")
-        .port();
+    let port = listener.local_addr().expect("Failed to get address").port();
     println!("PORT: {}", port);
 
     let server = zero_2_prod::run(listener).expect("Failed to bind address");
