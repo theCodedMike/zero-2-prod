@@ -1,17 +1,21 @@
+use sqlx::PgPool;
 use std::net::TcpListener;
+use zero_2_prod::configuration;
+use zero_2_prod::startup;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    // Port 0 is special-cased at the OS level: trying to bind port 0 will trigger an OS scan for an available port which
-    // will then be bound to the application.
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
+    // Panic if we can't read configuration
+    let config = configuration::get_configuration().expect("Failed to read configuration");
+    // We have removed the hard-coded `8000` - it's now coming from our settings!
+    let address = format!("127.0.0.1:{}", config.application_port);
+    let listener = TcpListener::bind(address)?;
 
-    // To obtain the port, otherwise can't test
-    // cargo r -- --show-output
-    let port = listener.local_addr().expect("Failed to get address").port();
-    println!("==============>PORT: {}", port);
+    let pg_pool = PgPool::connect(config.database.connection_string().as_str())
+        .await
+        .expect("Failed to connect to Postgres");
 
     // Bubble up the io::Error if we failed to bind the address
     // Otherwise call .await on our Server
-    zero_2_prod::run(listener)?.await
+    startup::run(listener, pg_pool)?.await
 }
