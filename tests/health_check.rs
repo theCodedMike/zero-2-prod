@@ -1,9 +1,64 @@
 //! tests/health_check.rs
 
-use sqlx::PgPool;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
+use uuid::Uuid;
 use zero_2_prod::configuration;
+use zero_2_prod::configuration::DatabaseSettings;
 use zero_2_prod::startup;
+
+pub struct TestApp {
+    pub address: String,
+    pub connect_pool: PgPool,
+}
+
+/// Spin up an instance of our application
+/// and returns its address (i.e. http://localhost:XXXX)
+/// Launch our application in the background ~somehow~
+/// No .await call, therefore no need for `spawn_app` to be async now.
+/// We are also running tests, so it is not worth it to propagate errors:
+/// if we fail to perform the required setup we can just panic and crash
+/// all the things.
+async fn spawn_app() -> TestApp {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
+    let port = listener.local_addr().unwrap().port();
+    let address = format!("http://127.0.0.1:{}", port);
+
+    let mut config = configuration::get_configuration().expect("Failed to read configuration");
+    config.database.database_name = Uuid::new_v4().to_string();
+    let pg_pool = configure_database(&config.database).await;
+
+    let server = startup::run(listener, pg_pool.clone()).expect("Failed to bind address");
+    // Launch the server as a background task
+    // tokio::spawn returns a handle to the spawned future,
+    // but we have no use for it here, hence the non-binding let
+    let _ = tokio::spawn(server);
+
+    // We return the application address to the caller!
+    TestApp {
+        address,
+        connect_pool: pg_pool,
+    }
+}
+pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
+    // Create database
+    let mut connection = PgConnection::connect(config.connection_string_without_db().as_str())
+        .await
+        .expect("Failed to connect to Postgres");
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
+        .await
+        .expect("Failed to create database");
+    // Migrate database
+    let pg_pool = PgPool::connect(config.connection_string().as_str())
+        .await
+        .expect("Failed to connect to Postgres");
+    sqlx::migrate!("./migrations")
+        .run(&pg_pool)
+        .await
+        .expect("Failed to migrate the database");
+    pg_pool
+}
 
 /// `tokio::test` is the testing equivalent of `tokio::main`.
 /// It also spares you from having to specify the `#[test]` attribute.
@@ -26,41 +81,6 @@ async fn health_check_works() {
     // Assert
     assert!(response.status().is_success());
     assert_eq!(Some(0), response.content_length());
-}
-
-pub struct TestApp {
-    pub address: String,
-    pub connect_pool: PgPool,
-}
-
-/// Spin up an instance of our application
-/// and returns its address (i.e. http://localhost:XXXX)
-/// Launch our application in the background ~somehow~
-/// No .await call, therefore no need for `spawn_app` to be async now.
-/// We are also running tests, so it is not worth it to propagate errors:
-/// if we fail to perform the required setup we can just panic and crash
-/// all the things.
-async fn spawn_app() -> TestApp {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{}", port);
-
-    let config = configuration::get_configuration().expect("Failed to read configuration");
-    let pg_pool = PgPool::connect(config.database.connection_string().as_str())
-        .await
-        .expect("Failed to connect to Postgres");
-
-    let server = startup::run(listener, pg_pool.clone()).expect("Failed to bind address");
-    // Launch the server as a background task
-    // tokio::spawn returns a handle to the spawned future,
-    // but we have no use for it here, hence the non-binding let
-    let _ = tokio::spawn(server);
-
-    // We return the application address to the caller!
-    TestApp {
-        address,
-        connect_pool: pg_pool,
-    }
 }
 
 #[tokio::test]
