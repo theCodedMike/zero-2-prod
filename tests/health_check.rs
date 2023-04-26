@@ -1,9 +1,9 @@
 //! tests/health_check.rs
 
 use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
-use secrecy::ExposeSecret;
 use uuid::Uuid;
 use zero_2_prod::configuration;
 use zero_2_prod::configuration::DatabaseSettings;
@@ -62,9 +62,10 @@ async fn spawn_app() -> TestApp {
 }
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     // Create database
-    let mut connection = PgConnection::connect(config.connection_string_without_db().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres");
+    let mut connection =
+        PgConnection::connect(config.connection_string_without_db().expose_secret())
+            .await
+            .expect("Failed to connect to Postgres");
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await

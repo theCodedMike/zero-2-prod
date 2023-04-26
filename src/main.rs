@@ -1,6 +1,6 @@
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use std::net::TcpListener;
-use secrecy::ExposeSecret;
 use zero_2_prod::configuration;
 use zero_2_prod::startup;
 use zero_2_prod::telemetry;
