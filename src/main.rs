@@ -1,5 +1,6 @@
 use sqlx::PgPool;
 use std::net::TcpListener;
+use secrecy::ExposeSecret;
 use zero_2_prod::configuration;
 use zero_2_prod::startup;
 use zero_2_prod::telemetry;
@@ -16,7 +17,7 @@ async fn main() -> Result<(), std::io::Error> {
     let address = format!("127.0.0.1:{}", config.application_port);
     let listener = TcpListener::bind(address)?;
 
-    let pg_pool = PgPool::connect(config.database.connection_string().as_str())
+    let pg_pool = PgPool::connect(config.database.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres");
 
