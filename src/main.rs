@@ -6,7 +6,8 @@ use zero_2_prod::telemetry;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let subscriber = telemetry::get_subscriber("zero-2-prod".into(), "info".into());
+    let subscriber =
+        telemetry::get_subscriber("zero-2-prod".into(), "info".into(), std::io::stdout);
     telemetry::init_subscriber(subscriber);
 
     // Panic if we can't read configuration
