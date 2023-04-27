@@ -1,6 +1,8 @@
 use secrecy::ExposeSecret;
+use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::net::TcpListener;
+use std::time::Duration;
 use zero_2_prod::configuration;
 use zero_2_prod::startup;
 use zero_2_prod::telemetry;
@@ -14,12 +16,15 @@ async fn main() -> Result<(), std::io::Error> {
     // Panic if we can't read configuration
     let config = configuration::get_configuration().expect("Failed to read configuration");
     // We have removed the hard-coded `8000` - it's now coming from our settings!
-    let address = format!("127.0.0.1:{}", config.application_port);
+    // 0.0.0.0 as host to instruct our application to accept connections from any network interface,
+    // not just the local one.
+    let address = format!("{}:{}", config.application.host, config.application.port);
     let listener = TcpListener::bind(address)?;
 
-    let pg_pool = PgPool::connect(config.database.connection_string().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres");
+    let pg_pool = PgPoolOptions::new()
+        .acquire_timeout(Duration::from_secs(5))
+        .connect_lazy(config.database.connection_string().expose_secret())
+        .expect("Failed to create Postgres connection pool");
 
     // Bubble up the io::Error if we failed to bind the address
     // Otherwise call .await on our Server
