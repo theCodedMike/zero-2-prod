@@ -1,0 +1,37 @@
+name: zero-2-prod
+services:
+  backend:
+    build:
+      context: ./
+    environment:
+      - APP_ENV=prod
+    networks:
+      - server-side
+    ports:
+      - 8000:8000
+    volumes:
+      - ./src:/code/src
+      - backend-cache:/code/target
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15.2
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=newsletter
+    networks:
+      - server-side
+    ports:
+      - 5432:5432
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+networks:
+  server-side: {}
+
+volumes:
+  backend-cache: {}
+  db-data: {}

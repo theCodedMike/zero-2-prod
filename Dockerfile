@@ -1,6 +1,6 @@
 # We use the latest Rust stable release as base image
 # Builder stage
-FROM lukemathwalker/cargo-chef:latest-rust-slim-bullseye as chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.69.0 as chef
 # Let's switch our working directory to `app` (equivalent to `cd app`)
 # The `app` folder will be created for us by Docker in case it does not
 # exist already.
@@ -8,11 +8,13 @@ WORKDIR /app
 # Install the required system dependencies for our linking configuration
 RUN apt update && apt install lld clang -y
 
+
 FROM chef as planner
 # Copy all files from our working environment to our Docker image
 COPY . .
 # Compute a lock-like file for our project
 RUN cargo chef prepare --recipe-path recipe.json
+
 
 FROM chef as builder
 COPY --from=planner /app/recipe.json recipe.json
@@ -25,6 +27,7 @@ ENV SQLX_OFFLINE true
 # Let's build our binary!
 # We'll use the release profile to make it faaaast
 RUN cargo build --release --bin zero-2-prod
+
 
 # Runtime stage
 FROM debian:bullseye-slim AS runtime
