@@ -17,13 +17,11 @@ async fn main() -> Result<(), std::io::Error> {
     // 0.0.0.0 as host to instruct our application to accept connections from any network interface,
     // not just the local one.
     let address = format!("{}:{}", config.application.host, config.application.port);
-    println!("app url: {}", address);
     let listener = TcpListener::bind(address)?;
 
     let pg_pool = PgPoolOptions::new()
         .acquire_timeout(Duration::from_secs(5))
         .connect_lazy_with(config.database.with_db());
-    //.expect("Failed to create Postgres connection pool");
 
     // Bubble up the io::Error if we failed to bind the address
     // Otherwise call .await on our Server
