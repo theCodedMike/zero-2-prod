@@ -13,14 +13,12 @@ use zero_2_prod::telemetry;
 static TRACING: Lazy<()> = Lazy::new(|| {
     let default_filter_level = "info".to_string();
     let subscriber_name = "test".to_string();
-    let subscriber;
-    if std::env::var("TEST_LOG").is_ok() {
-        subscriber =
-            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
-    } else {
-        subscriber =
-            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::sink);
-    }
+    let mut writer = std::io::sink;
+    // 这里先注释掉，会报类型不匹配
+    /*if std::env::var("TEST_LOG").is_ok() {
+        writer = std::io::stdout;
+    }*/
+    let subscriber = telemetry::get_subscriber(subscriber_name, default_filter_level, writer);
     telemetry::init_subscriber(subscriber);
 });
 
