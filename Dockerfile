@@ -23,7 +23,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Up to this point, if our dependency tree stays the same, all layers should be cached.
 COPY . .
 # Force sqlx to look at the saved metadata(sqlx-data.json) instead of trying to query a live database
-ENV SQLX_OFFLINE true
+ENV SQLX_OFFLINE=true
 # Let's build our binary!
 # We'll use the release profile to make it faaaast
 RUN cargo build --release --bin zero-2-prod
@@ -45,6 +45,6 @@ COPY --from=builder /app/target/release/zero-2-prod zero-2-prod
 # We need the configuration file at runtime!
 COPY configuration configuration
 # Instruct the binary in our Docker image to use the production configuration
-ENV APP_ENV prod
+ENV APP_ENVIRONMENT=production
 # When `docker run` is executed, launch the binary!
 ENTRYPOINT ["./zero-2-prod"]

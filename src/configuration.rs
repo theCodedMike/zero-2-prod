@@ -6,7 +6,7 @@ use sqlx::ConnectOptions;
 use tracing::log::LevelFilter;
 
 const LOCAL_ENVIRONMENT: &'static str = "local";
-const PRODUCTION_ENVIRONMENT: &'static str = "prod";
+const PRODUCTION_ENVIRONMENT: &'static str = "production";
 
 #[derive(Deserialize)]
 pub struct Settings {
@@ -56,10 +56,10 @@ pub fn get_configuration() -> Result<Settings, ConfigError> {
     let config_dir = base_path.join("configuration");
     // Detect the running environment.
     // Default to `local` if unspecified.
-    let environment: Environment = std::env::var("APP_ENV")
+    let environment: Environment = std::env::var("APP_ENVIRONMENT")
         .unwrap_or_else(|_| LOCAL_ENVIRONMENT.into())
         .try_into()
-        .expect("Failed to parse APP_ENV");
+        .expect("Failed to parse APP_ENVIRONMENT");
     let environment_filename = format!("{}.yaml", environment.as_str());
     // Initialise our configuration reader
     let settings = Config::builder()
