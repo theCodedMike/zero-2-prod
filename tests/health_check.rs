@@ -3,9 +3,11 @@
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
+use std::time::Duration;
 use uuid::Uuid;
 use zero_2_prod::configuration;
 use zero_2_prod::configuration::DatabaseSettings;
+use zero_2_prod::email_client::EmailClient;
 use zero_2_prod::startup;
 use zero_2_prod::telemetry;
 
@@ -45,7 +47,20 @@ async fn spawn_app() -> TestApp {
     config.database.database_name = Uuid::new_v4().to_string();
     let pg_pool = configure_database(&config.database).await;
 
-    let server = startup::run(listener, pg_pool.clone()).expect("Failed to bind address");
+    // Build an `EmailClient` using `configuration`
+    let sender_email = config
+        .email_client
+        .sender()
+        .expect("Invalid sender email address");
+    let email_client = EmailClient::new(
+        config.email_client.base_url,
+        sender_email,
+        config.email_client.authorization_token,
+        Duration::from_secs(5)
+    );
+
+    let server =
+        startup::run(listener, pg_pool.clone(), email_client).expect("Failed to bind address");
     // Launch the server as a background task
     // tokio::spawn returns a handle to the spawned future,
     // but we have no use for it here, hence the non-binding let

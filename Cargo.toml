@@ -22,15 +22,18 @@ name = "zero-2-prod"
 # Dev dependencies are used exclusively when running tests or examples
 # They do not get included in the final application binary!
 [dev-dependencies]
-reqwest = "0.11"
+# reqwest = "0.11"
 fake = "~2.3" # generate fake email
 quickcheck = "0.9.2"
 quickcheck_macros = "0.9.1"
+tokio = { version = "1", features = ["rt", "macros"] }
+wiremock = "0.5"
 
 [dependencies]
 actix-web = "4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 config = { version = "0.13", default-features = false, features = ["yaml"]}
 sqlx = { version = "0.6", default-features = false, features = ["runtime-actix-rustls", "macros", "postgres", "uuid", "chrono", "migrate", "offline"] }
 uuid = { version = "1", features = ["v4"] }
@@ -48,3 +51,4 @@ serde-aux = "4"
 unicode-segmentation = "1"
 claims = "0.7" # assert
 validator = "0.16" # validate email
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"]}

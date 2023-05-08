@@ -2,6 +2,7 @@ use sqlx::postgres::PgPoolOptions;
 use std::net::TcpListener;
 use std::time::Duration;
 use zero_2_prod::configuration;
+use zero_2_prod::email_client::EmailClient;
 use zero_2_prod::startup;
 use zero_2_prod::telemetry;
 
@@ -23,8 +24,22 @@ async fn main() -> Result<(), std::io::Error> {
         .acquire_timeout(Duration::from_secs(5))
         .connect_lazy_with(config.database.with_db());
 
+    // Build an `EmailClient` using `configuration`
+    let sender_email = config
+        .email_client
+        .sender()
+        .expect("Invalid sender email address");
+    let timeout = config.email_client.timeout();
+    let email_client = EmailClient::new(
+        config.email_client.base_url,
+        sender_email,
+        config.email_client.authorization_token,
+        timeout
+    );
+
     // Bubble up the io::Error if we failed to bind the address
     // Otherwise call .await on our Server
-    startup::run(listener, pg_pool)?.await?;
+    startup::run(listener, pg_pool, email_client)?.await?;
+
     Ok(())
 }
