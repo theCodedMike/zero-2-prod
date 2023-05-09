@@ -1,9 +1,5 @@
-use sqlx::postgres::PgPoolOptions;
-use std::net::TcpListener;
-use std::time::Duration;
 use zero_2_prod::configuration;
-use zero_2_prod::email_client::EmailClient;
-use zero_2_prod::startup;
+use zero_2_prod::startup::Application;
 use zero_2_prod::telemetry;
 
 #[tokio::main]
@@ -14,32 +10,8 @@ async fn main() -> Result<(), std::io::Error> {
 
     // Panic if we can't read configuration
     let config = configuration::get_configuration().expect("Failed to read configuration");
-    // We have removed the hard-coded `8000` - it's now coming from our settings!
-    // 0.0.0.0 as host to instruct our application to accept connections from any network interface,
-    // not just the local one.
-    let address = format!("{}:{}", config.application.host, config.application.port);
-    let listener = TcpListener::bind(address)?;
-
-    let pg_pool = PgPoolOptions::new()
-        .acquire_timeout(Duration::from_secs(5))
-        .connect_lazy_with(config.database.with_db());
-
-    // Build an `EmailClient` using `configuration`
-    let sender_email = config
-        .email_client
-        .sender()
-        .expect("Invalid sender email address");
-    let timeout = config.email_client.timeout();
-    let email_client = EmailClient::new(
-        config.email_client.base_url,
-        sender_email,
-        config.email_client.authorization_token,
-        timeout,
-    );
-
-    // Bubble up the io::Error if we failed to bind the address
-    // Otherwise call .await on our Server
-    startup::run(listener, pg_pool, email_client)?.await?;
+    let application = Application::build(config).await?;
+    application.run_until_stopped().await?;
 
     Ok(())
 }

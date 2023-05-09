@@ -1,4 +1,4 @@
-use crate::helpers;
+use crate::helpers::TestApp;
 
 /// `tokio::test` is the testing equivalent of `tokio::api`.
 /// It also spares you from having to specify the `#[test]` attribute.
@@ -8,16 +8,13 @@ use crate::helpers;
 #[tokio::test]
 async fn health_check_works() {
     // Arrange. No .await, no .expect
-    let app = helpers::spawn_app().await;
+    let app = TestApp::spawn_app().await;
+
     // We need to bring in `reqwest`
     // to perform HTTP requests against our application.
-    let client = reqwest::Client::new();
     // Act
-    let response = client
-        .get(app.address + "/health_check")
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let response = app.get_health_check().await;
+
     // Assert
     assert!(response.status().is_success());
     assert_eq!(Some(0), response.content_length());
