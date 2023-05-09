@@ -1,4 +1,3 @@
-use std::time::Duration;
 use crate::domain::{InvalidReason, SubscriberEmail};
 use config::{Config, ConfigError, File};
 use secrecy::{ExposeSecret, Secret};
@@ -6,10 +5,11 @@ use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
+use std::time::Duration;
 use tracing::log::LevelFilter;
 
-const LOCAL_ENVIRONMENT: &'static str = "local";
-const PRODUCTION_ENVIRONMENT: &'static str = "production";
+const LOCAL_ENVIRONMENT: &str = "local";
+const PRODUCTION_ENVIRONMENT: &str = "production";
 
 #[derive(Deserialize)]
 pub struct Settings {
@@ -62,7 +62,7 @@ pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
     pub authorization_token: Secret<String>,
-    pub timeout_milliseconds: u64
+    pub timeout_milliseconds: u64,
 }
 
 impl EmailClientSettings {

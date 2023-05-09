@@ -19,7 +19,7 @@ impl EmailClient {
         base_url: String,
         sender: SubscriberEmail,
         authorization_token: Secret<String>,
-        timeout: Duration
+        timeout: Duration,
     ) -> Self {
         let http_client = Client::builder()
             // timeout is a MUST option for client
@@ -127,7 +127,12 @@ mod tests {
 
     /// Get a test instance of `EmailClient`.
     fn email_client(base_url: String) -> EmailClient {
-        EmailClient::new(base_url, email(), Secret::new(Faker.fake()), Duration::from_secs(5))
+        EmailClient::new(
+            base_url,
+            email(),
+            Secret::new(Faker.fake()),
+            Duration::from_secs(5),
+        )
     }
 
     #[tokio::test]

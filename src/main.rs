@@ -34,7 +34,7 @@ async fn main() -> Result<(), std::io::Error> {
         config.email_client.base_url,
         sender_email,
         config.email_client.authorization_token,
-        timeout
+        timeout,
     );
 
     // Bubble up the io::Error if we failed to bind the address
