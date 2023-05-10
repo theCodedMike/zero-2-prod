@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use reqwest::Response;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero_2_prod::configuration;
 use zero_2_prod::configuration::DatabaseSettings;
 use zero_2_prod::telemetry;
@@ -23,6 +24,7 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 pub struct TestApp {
     pub address: String,
     pub connect_pool: PgPool,
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -36,6 +38,9 @@ impl TestApp {
     pub async fn spawn_app() -> Self {
         Lazy::force(&TRACING);
 
+        // Launch a mock server to stand in for Postmark's API
+        let email_server = MockServer::start().await;
+
         // Randomise configuration to ensure test isolation
         let configuration = {
             let mut config =
@@ -44,6 +49,8 @@ impl TestApp {
             config.database.database_name = Uuid::new_v4().to_string();
             // Use a random OS port
             config.application.port = 0;
+            // Use the mock server as email API
+            config.email_client.base_url = email_server.uri();
             config
         };
 
@@ -67,6 +74,7 @@ impl TestApp {
         TestApp {
             address,
             connect_pool: startup::get_connection_pool(&configuration.database),
+            email_server,
         }
     }
 

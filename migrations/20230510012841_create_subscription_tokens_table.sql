@@ -1,0 +1,12 @@
+-- sqlx migrate add create_subscription_tokens_table
+
+-- Add migration script here
+-- Create Subscription Tokens Table
+CREATE TABLE subscription_tokens
+(
+    subscription_token TEXT NOT NULL,
+    subscriber_id      uuid NOT NULL
+        REFERENCES subscriptions (id),
+    PRIMARY KEY (subscription_token)
+
+);

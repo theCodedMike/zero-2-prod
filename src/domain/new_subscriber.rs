@@ -17,6 +17,14 @@ impl NewSubscriber {
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
+
+    pub fn get_email(&self) -> &SubscriberEmail {
+        &self.email
+    }
+
+    pub fn get_name(&self) -> &SubscriberName {
+        &self.name
+    }
 }
 
 #[derive(Debug)]

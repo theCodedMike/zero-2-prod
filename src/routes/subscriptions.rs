@@ -1,4 +1,5 @@
 use crate::domain::{InvalidReason, NewSubscriber};
+use crate::email_client::EmailClient;
 use crate::request::FormData;
 use actix_web::{web, HttpResponse};
 use chrono::Local;
@@ -7,13 +8,17 @@ use uuid::Uuid;
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(form, pool),
+    skip(form, pool, email_client),
     fields(
         subscriber_email = %form.email,
         subscriber_name = %form.name
     )
 )]
-pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<PgPool>) -> HttpResponse {
+pub async fn subscribe(
+    form: web::Form<FormData>,
+    pool: web::Data<PgPool>,
+    email_client: web::Data<EmailClient>,
+) -> HttpResponse {
     // `web::Form` is a wrapper around `FormData`
     // `form.0` gives us access to the underlying `FormData`
     let subscriber = match form.into_inner().try_into() {
@@ -21,15 +26,24 @@ pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<PgPool>) -> Ht
         Err(err) => {
             return HttpResponse::BadRequest()
                 .reason(InvalidReason::as_str(&err))
-                .finish()
+                .finish();
         }
     };
 
     // insert
-    match insert_subscriber(&pool, &subscriber).await {
-        Ok(_) => HttpResponse::Ok().finish(),
-        Err(_) => HttpResponse::InternalServerError().finish(),
+    if insert_subscriber(&pool, &subscriber).await.is_err() {
+        return HttpResponse::InternalServerError().finish();
     }
+
+    // send confirmation email
+    if send_confirmation_email(&email_client, &subscriber)
+        .await
+        .is_err()
+    {
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    HttpResponse::Ok().finish()
 }
 
 #[tracing::instrument(
@@ -39,8 +53,8 @@ pub async fn subscribe(form: web::Form<FormData>, pool: web::Data<PgPool>) -> Ht
 pub async fn insert_subscriber(pool: &PgPool, subscriber: &NewSubscriber) -> Result<(), Error> {
     sqlx::query!(
         r#"
-        INSERT INTO subscriptions (id, email, name, subscribed_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO subscriptions (id, email, name, subscribed_at, status)
+        VALUES ($1, $2, $3, $4, 'pending_confirmation')
     "#,
         Uuid::new_v4(),
         subscriber.email(),
@@ -58,4 +72,32 @@ pub async fn insert_subscriber(pool: &PgPool, subscriber: &NewSubscriber) -> Res
         // We will talk about error handling in depth later!
     })?;
     Ok(())
+}
+
+#[tracing::instrument(
+    name = "Send a confirmation email to a new subscriber",
+    skip(email_client, new_subscriber)
+)]
+pub async fn send_confirmation_email(
+    email_client: &EmailClient,
+    new_subscriber: &NewSubscriber,
+) -> Result<(), reqwest::Error> {
+    let confirmation_link = "https://there-is-no-such-domain.com/subscriptions/confirm";
+    let html_body = format!(
+        "Welcome to our newsletter!<br />\
+                Click <a href=\"{}\">here</a> to confirm your subscription.",
+        confirmation_link
+    );
+    let plain_body = format!(
+        "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
+        confirmation_link
+    );
+    email_client
+        .send_email(
+            new_subscriber.get_email(),
+            "Welcome!",
+            &html_body,
+            &plain_body,
+        )
+        .await
 }
