@@ -6,7 +6,7 @@ use actix_web::{web, HttpResponse};
 use chrono::Local;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use sqlx::{Error, PgPool};
+use sqlx::{Error, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 #[tracing::instrument(
@@ -34,18 +34,29 @@ pub async fn subscribe(
         }
     };
 
+    // get a transaction object
+    let mut transaction =  match pool.begin().await {
+        Ok(transaction) => transaction,
+        Err(_) => return HttpResponse::InternalServerError().finish()
+    };
+
     // insert subscriptions table
-    let subscriber_id = match insert_subscriber(&pool, &subscriber).await {
+    let subscriber_id = match insert_subscriber(&mut transaction, &subscriber).await {
         Ok(subscriber_id) => subscriber_id,
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
     let subscription_token = generate_subscription_token();
 
     // insert subscription_tokens table
-    if store_token(&pool, subscriber_id, &subscription_token)
+    if store_token(&mut transaction, subscriber_id, &subscription_token)
         .await
         .is_err()
     {
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    // explicitly commit
+    if transaction.commit().await.is_err(){
         return HttpResponse::InternalServerError().finish();
     }
 
@@ -69,7 +80,7 @@ pub async fn subscribe(
     name = "Saving new subscriber details in the database",
     skip(subscriber, pool)
 )]
-async fn insert_subscriber(pool: &PgPool, subscriber: &NewSubscriber) -> Result<Uuid, Error> {
+async fn insert_subscriber(pool: &mut Transaction<'_, Postgres>, subscriber: &NewSubscriber) -> Result<Uuid, Error> {
     let subscriber_id = Uuid::new_v4();
     sqlx::query!(
         r#"
@@ -99,7 +110,7 @@ async fn insert_subscriber(pool: &PgPool, subscriber: &NewSubscriber) -> Result<
     skip(pool)
 )]
 async fn store_token(
-    pool: &PgPool,
+    pool: &mut Transaction<'_, Postgres>,
     subscriber_id: Uuid,
     subscription_token: &str,
 ) -> Result<(), Error> {
