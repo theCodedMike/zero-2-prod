@@ -1,5 +1,6 @@
+use linkify::{LinkFinder, LinkKind};
 use once_cell::sync::Lazy;
-use reqwest::Response;
+use reqwest::{Response, Url};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -25,6 +26,7 @@ pub struct TestApp {
     pub address: String,
     pub connect_pool: PgPool,
     pub email_server: MockServer,
+    pub port: u16,
 }
 
 impl TestApp {
@@ -63,7 +65,7 @@ impl TestApp {
             .expect("Failed to build application.");
 
         // Get the port before spawning the application
-        let address = format!("http://127.0.0.1:{}", application.port());
+        let app_port = application.port();
 
         // Launch the server as a background task
         // tokio::spawn returns a handle to the spawned future,
@@ -72,9 +74,10 @@ impl TestApp {
 
         // We return the application address to the caller!
         TestApp {
-            address,
+            address: format!("http://127.0.0.1:{}", app_port),
             connect_pool: startup::get_connection_pool(&configuration.database),
             email_server,
+            port: app_port,
         }
     }
 
@@ -94,6 +97,40 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    /// Extract the confirmation links embedded in the request to the email API.
+    pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
+        // Parse the body as JSON, starting from raw bytes
+        let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+
+        // Extract the link from one of the request fields.
+        let get_link = |s: &str| {
+            let links = LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == LinkKind::Url)
+                .collect::<Vec<_>>();
+            assert_eq!(links.len(), 1);
+
+            let raw_link = links[0].as_str().to_owned();
+            let mut confirmation_url =
+                Url::parse(&raw_link).expect("Failed to parse confirmation link");
+            // Let's make sure we don't call random APIs on the web
+            assert_eq!(confirmation_url.host_str().unwrap(), "127.0.0.1");
+            confirmation_url.set_port(Some(self.port)).unwrap();
+
+            confirmation_url
+        };
+
+        // looks like this:
+        // http://127.0.0.1:54922/subscriptions/confirm?subscription_token=kMEVpO6hQfQsFylxUE3R9ouAZ
+        let html_link = get_link(body["HtmlBody"].as_str().unwrap());
+        let text_link = get_link(body["TextBody"].as_str().unwrap());
+
+        ConfirmationLinks {
+            html: html_link,
+            plain_text: text_link,
+        }
     }
 }
 
@@ -116,4 +153,11 @@ async fn configure_database(config: &DatabaseSettings) {
         .run(&pg_pool)
         .await
         .expect("Failed to migrate the database");
+}
+
+/// Confirmation links embedded in the request to the email API.
+#[derive(Debug)]
+pub struct ConfirmationLinks {
+    pub html: Url,
+    pub plain_text: Url,
 }

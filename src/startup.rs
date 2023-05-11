@@ -40,7 +40,7 @@ impl Application {
         let listener = TcpListener::bind(address)?;
         let port = listener.local_addr().unwrap().port();
 
-        let server = run(listener, pg_pool, email_client)?;
+        let server = run(listener, pg_pool, email_client, config.application.base_url)?;
 
         // We "save" the bound port in one of `Application`'s fields
         Ok(Self { port, server })
@@ -57,19 +57,27 @@ impl Application {
     }
 }
 
-/// We need to mark `run` as public.
-/// It is no longer a binary entrypoint, therefore we can mark it as async
-/// without having to use any proc-macro incantation.
-pub fn run(
+// We need to define a wrapper type in order to retrieve the URL
+// in the `subscribe` handler.
+// Retrieval from the context, in actix-web, is type-based: using
+// a raw `String` would expose us to conflicts.
+#[derive(Debug)]
+pub struct ApplicationBaseUrl(pub String);
+
+fn run(
     listener: TcpListener,
     pg_pool: PgPool,
     email_client: EmailClient,
+    app_base_url: String,
 ) -> Result<Server, std::io::Error> {
     // Wrap the connection in a smart pointer
     let connect_pool = web::Data::new(pg_pool);
 
     // Re-use the same HTTP client across multiple requests
     let email_client = web::Data::new(email_client);
+
+    // Use at sending confirmation email
+    let app_base_url = web::Data::new(ApplicationBaseUrl(app_base_url));
 
     // Capture `connection` from the surrounding environment
     let server = HttpServer::new(move || {
@@ -80,8 +88,10 @@ pub fn run(
             // Get a pointer copy and attach it to the application state
             .app_data(connect_pool.clone())
             .app_data(email_client.clone())
+            .app_data(app_base_url.clone())
             .route("/health_check", web::get().to(routes::health_check))
             .route("/subscriptions", web::post().to(routes::subscribe))
+            .route("/subscriptions/confirm", web::get().to(routes::confirm))
     })
     .listen(listener)?
     .run();
