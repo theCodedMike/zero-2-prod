@@ -26,7 +26,10 @@ pub async fn subscribe(
 ) -> Result<HttpResponse, SubscribeError> {
     // `web::Form` is a wrapper around `FormData`
     // `form.0` gives us access to the underlying `FormData`
-    let subscriber = form.into_inner().try_into()?;
+    let subscriber = form
+        .into_inner()
+        .try_into()
+        .map_err(SubscribeError::ValidationError)?;
 
     // get a transaction object
     let mut transaction = pool.begin().await.map_err(SubscribeError::PoolError)?;

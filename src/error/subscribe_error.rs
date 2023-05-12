@@ -4,15 +4,27 @@ use actix_web::http::StatusCode;
 use actix_web::ResponseError;
 use std::fmt::{Debug, Display, Formatter};
 
+#[derive(thiserror::Error)]
 pub enum SubscribeError {
+    #[error("{0}")]
     ValidationError(InvalidReason),
-    PoolError(sqlx::Error),
-    InsertSubscriberError(sqlx::Error),
-    TransactionCommitError(sqlx::Error),
-    StoreTokenError(StoreTokenError),
-    SendEmailError(reqwest::Error),
-}
 
+    #[error("Failed to acquire a Postgres connection from the pool.")]
+    PoolError(#[source] sqlx::Error),
+
+    #[error("Failed to insert new subscriber in the database.")]
+    InsertSubscriberError(#[source] sqlx::Error),
+
+    #[error("Failed to commit SQL transaction to store a new subscriber.")]
+    TransactionCommitError(#[source] sqlx::Error),
+
+    #[error("Failed to store the confirmation token for a new subscriber.")]
+    StoreTokenError(#[from] StoreTokenError),
+
+    #[error("Failed to send a confirmation email.")]
+    SendEmailError(#[from] reqwest::Error),
+}
+/*
 impl From<InvalidReason> for SubscribeError {
     fn from(value: InvalidReason) -> Self {
         Self::ValidationError(value)
@@ -54,12 +66,6 @@ impl Display for SubscribeError {
     }
 }
 
-impl Debug for SubscribeError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        crate::error::error_chain_fmt(self, f)
-    }
-}
-
 impl std::error::Error for SubscribeError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -71,6 +77,15 @@ impl std::error::Error for SubscribeError {
             SubscribeError::StoreTokenError(e) => Some(e),
             SubscribeError::SendEmailError(e) => Some(e),
         }
+    }
+}
+*/
+
+// We are still using a bespoke implementation of `Debug`
+// to get a nice report using the error source chain
+impl Debug for SubscribeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        crate::error::error_chain_fmt(self, f)
     }
 }
 

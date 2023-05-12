@@ -54,3 +54,4 @@ claims = "0.7" # assert
 validator = "0.16" # validate email
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"]}
 rand = { version = "0.8", features = ["std_rng"] } # generate token
+thiserror = "1" # generate From template code
