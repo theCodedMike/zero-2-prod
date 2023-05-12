@@ -4,6 +4,7 @@ use crate::error::{StoreTokenError, SubscribeError};
 use crate::request::FormData;
 use crate::startup::ApplicationBaseUrl;
 use actix_web::{web, HttpResponse};
+use anyhow::Context;
 use chrono::Local;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -32,22 +33,27 @@ pub async fn subscribe(
         .map_err(SubscribeError::ValidationError)?;
 
     // get a transaction object
-    let mut transaction = pool.begin().await.map_err(SubscribeError::PoolError)?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .context("Failed to acquire a Postgres connection from the pool.")?;
 
     // insert subscriptions table
     let subscriber_id = insert_subscriber(&mut transaction, &subscriber)
         .await
-        .map_err(SubscribeError::InsertSubscriberError)?;
+        .context("Failed to insert new subscriber in the database.")?;
     let subscription_token = generate_subscription_token();
 
     // insert subscription_tokens table
-    store_token(&mut transaction, subscriber_id, &subscription_token).await?;
+    store_token(&mut transaction, subscriber_id, &subscription_token)
+        .await
+        .context("Failed to store the confirmation token for a new subscriber.")?;
 
     // explicitly commit
     transaction
         .commit()
         .await
-        .map_err(SubscribeError::TransactionCommitError)?;
+        .context("Failed to commit SQL transaction to store a new subscriber.")?;
 
     // send confirmation email
     send_confirmation_email(
@@ -56,7 +62,8 @@ pub async fn subscribe(
         &app_base_url,
         &subscription_token,
     )
-    .await?;
+    .await
+    .context("Failed to send a confirmation email.")?;
 
     Ok(HttpResponse::Ok().finish())
 }

@@ -8,6 +8,14 @@ use std::fmt::{Debug, Display, Formatter};
 pub enum SubscribeError {
     #[error("{0}")]
     ValidationError(InvalidReason),
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+}
+/*
+#[derive(thiserror::Error)]
+pub enum SubscribeError {
+    #[error("{0}")]
+    ValidationError(InvalidReason),
 
     #[error("Failed to acquire a Postgres connection from the pool.")]
     PoolError(#[source] sqlx::Error),
@@ -24,7 +32,6 @@ pub enum SubscribeError {
     #[error("Failed to send a confirmation email.")]
     SendEmailError(#[from] reqwest::Error),
 }
-/*
 impl From<InvalidReason> for SubscribeError {
     fn from(value: InvalidReason) -> Self {
         Self::ValidationError(value)
