@@ -1,10 +1,9 @@
 use crate::domain::NewSubscriber;
 use crate::email_client::EmailClient;
-use crate::error::{StoreTokenError, SubscribeError};
+use crate::error::BizErrorEnum;
 use crate::request::FormData;
 use crate::startup::ApplicationBaseUrl;
 use actix_web::{web, HttpResponse};
-use anyhow::Context;
 use chrono::Local;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -24,36 +23,29 @@ pub async fn subscribe(
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     app_base_url: web::Data<ApplicationBaseUrl>,
-) -> Result<HttpResponse, SubscribeError> {
+) -> Result<HttpResponse, BizErrorEnum> {
     // `web::Form` is a wrapper around `FormData`
     // `form.0` gives us access to the underlying `FormData`
-    let subscriber = form
-        .into_inner()
-        .try_into()
-        .map_err(SubscribeError::ValidationError)?;
+    let subscriber = form.into_inner().try_into()?;
 
     // get a transaction object
-    let mut transaction = pool
-        .begin()
-        .await
-        .context("Failed to acquire a Postgres connection from the pool.")?;
+    let mut transaction = pool.begin().await.map_err(|e| {
+        tracing::error!("Failed to get a transaction: {:?}", e);
+        BizErrorEnum::PgPoolError(e)
+    })?;
 
     // insert subscriptions table
-    let subscriber_id = insert_subscriber(&mut transaction, &subscriber)
-        .await
-        .context("Failed to insert new subscriber in the database.")?;
+    let subscriber_id = insert_subscriber(&mut transaction, &subscriber).await?;
     let subscription_token = generate_subscription_token();
 
     // insert subscription_tokens table
-    store_token(&mut transaction, subscriber_id, &subscription_token)
-        .await
-        .context("Failed to store the confirmation token for a new subscriber.")?;
+    store_token(&mut transaction, subscriber_id, &subscription_token).await?;
 
     // explicitly commit
-    transaction
-        .commit()
-        .await
-        .context("Failed to commit SQL transaction to store a new subscriber.")?;
+    transaction.commit().await.map_err(|e| {
+        tracing::error!("Failed to commit a transaction: {:?}", e);
+        BizErrorEnum::TransactionCommitError(e)
+    })?;
 
     // send confirmation email
     send_confirmation_email(
@@ -62,8 +54,7 @@ pub async fn subscribe(
         &app_base_url,
         &subscription_token,
     )
-    .await
-    .context("Failed to send a confirmation email.")?;
+    .await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -75,7 +66,7 @@ pub async fn subscribe(
 async fn insert_subscriber(
     pool: &mut Transaction<'_, Postgres>,
     subscriber: &NewSubscriber,
-) -> Result<Uuid, sqlx::Error> {
+) -> Result<Uuid, BizErrorEnum> {
     let subscriber_id = Uuid::new_v4();
     sqlx::query!(
         r#"
@@ -91,11 +82,8 @@ async fn insert_subscriber(
     .await
     .map_err(|e| {
         // 注意: 这里使用了:?，不使用也可以，使用:?可以以debug的格式展示错误信息，也更具体
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-        // Using the `?` operator to return early
-        // if the function failed, returning a sqlx::Error
-        // We will talk about error handling in depth later!
+        tracing::error!("Failed to insert into subscriptions: {:?}", e);
+        BizErrorEnum::InsertSubscriptionsError(e)
     })?;
     Ok(subscriber_id)
 }
@@ -105,7 +93,7 @@ async fn store_token(
     pool: &mut Transaction<'_, Postgres>,
     subscriber_id: Uuid,
     subscription_token: &str,
-) -> Result<(), StoreTokenError> {
+) -> Result<(), BizErrorEnum> {
     sqlx::query!(
         r#"
         INSERT INTO subscription_tokens (subscription_token, subscriber_id)
@@ -117,8 +105,8 @@ async fn store_token(
     .execute(pool)
     .await
     .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
+        tracing::error!("Failed to insert into subscription_tokens: {:?}", e);
+        BizErrorEnum::InsertSubscriptionTokensError(e)
     })?;
     Ok(())
 }
@@ -132,7 +120,7 @@ async fn send_confirmation_email(
     new_subscriber: &NewSubscriber,
     app_base_url: &ApplicationBaseUrl,
     subscription_token: &str,
-) -> Result<(), reqwest::Error> {
+) -> Result<(), BizErrorEnum> {
     let confirmation_link = format!(
         "{}/subscriptions/confirm?subscription_token={}",
         app_base_url.0.as_str(),

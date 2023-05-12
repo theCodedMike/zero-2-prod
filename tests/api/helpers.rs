@@ -19,7 +19,7 @@ static TRACING: Lazy<()> = Lazy::new(|| {
         writer = std::io::stdout;
     }*/
     let subscriber = telemetry::get_subscriber(subscriber_name, default_filter_level, writer);
-    telemetry::init_subscriber(subscriber);
+    telemetry::init_subscriber(subscriber).expect("Failed to set subscriber.");
 });
 
 pub struct TestApp {

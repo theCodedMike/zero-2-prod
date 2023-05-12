@@ -1,6 +1,8 @@
+mod business_error;
 mod store_token_error;
 mod subscribe_error;
 
+pub use business_error::BizErrorEnum;
 pub use store_token_error::StoreTokenError;
 pub use subscribe_error::SubscribeError;
 

@@ -1,5 +1,6 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
+use crate::error::BizErrorEnum;
 use crate::routes;
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
@@ -17,14 +18,11 @@ pub struct Application {
 
 impl Application {
     // We have converted the `build` function into a constructor for `Application`.
-    pub async fn build(config: Settings) -> Result<Self, std::io::Error> {
+    pub async fn build(config: Settings) -> Result<Self, BizErrorEnum> {
         let pg_pool = get_connection_pool(&config.database);
 
         // Build an `EmailClient` using `configuration`
-        let sender_email = config
-            .email_client
-            .sender()
-            .expect("Invalid sender email address");
+        let sender_email = config.email_client.sender()?;
         let timeout = config.email_client.timeout();
         let email_client = EmailClient::new(
             config.email_client.base_url,
@@ -37,7 +35,10 @@ impl Application {
         // 0.0.0.0 as host to instruct our application to accept connections from any network interface,
         // not just the local one.
         let address = format!("{}:{}", config.application.host, config.application.port);
-        let listener = TcpListener::bind(address)?;
+        let listener = TcpListener::bind(address).map_err(|e| {
+            tracing::error!("Failed to bind to TcpListener");
+            BizErrorEnum::BindTcpListenerError(e)
+        })?;
         let port = listener.local_addr().unwrap().port();
 
         let server = run(listener, pg_pool, email_client, config.application.base_url)?;
@@ -52,8 +53,11 @@ impl Application {
 
     // A more expressive name that makes it clear that
     // this function only returns when the application is stopped.
-    pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
-        self.server.await
+    pub async fn run_until_stopped(self) -> Result<(), BizErrorEnum> {
+        self.server.await.map_err(|e| {
+            tracing::error!("Failed to run server.");
+            BizErrorEnum::RunServerError(e)
+        })
     }
 }
 
@@ -69,7 +73,7 @@ fn run(
     pg_pool: PgPool,
     email_client: EmailClient,
     app_base_url: String,
-) -> Result<Server, std::io::Error> {
+) -> Result<Server, BizErrorEnum> {
     // Wrap the connection in a smart pointer
     let connect_pool = web::Data::new(pg_pool);
 
@@ -93,7 +97,11 @@ fn run(
             .route("/subscriptions", web::post().to(routes::subscribe))
             .route("/subscriptions/confirm", web::get().to(routes::confirm))
     })
-    .listen(listener)?
+    .listen(listener)
+    .map_err(|e| {
+        tracing::error!("Failed to listen to TcpListener");
+        BizErrorEnum::ListenTcpListenerError(e)
+    })?
     .run();
 
     // No .await here!

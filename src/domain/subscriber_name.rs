@@ -1,4 +1,4 @@
-use crate::domain::new_subscriber::InvalidReason;
+use crate::error::BizErrorEnum;
 use unicode_segmentation::UnicodeSegmentation;
 
 const FORBIDDEN_CHARACTERS: [char; 9] = ['/', '(', ')', '"', '<', '>', '\\', '{', '}'];
@@ -9,12 +9,12 @@ impl SubscriberName {
     /// Returns an instance of `SubscriberName` if the input satisfies all
     /// our validation constraints on subscriber names.
     /// It panics otherwise.
-    pub fn parse(name: String) -> Result<Self, InvalidReason> {
+    pub fn parse(name: String) -> Result<Self, BizErrorEnum> {
         // `.trim()` returns a view over the input `s` without trailing
         // whitespace-like characters.
         // `.is_empty` checks if the view contains any character.
         if name.trim().is_empty() {
-            return Err(InvalidReason::NameIsEmpty);
+            return Err(BizErrorEnum::SubscriberNameIsEmpty);
         };
 
         // A grapheme is defined by the Unicode standard as a "user-perceived"
@@ -25,7 +25,7 @@ impl SubscriberName {
         // `true` specifies that we want to use the extended grapheme definition set,
         // the recommended one.
         if name.graphemes(true).count() > 256 {
-            return Err(InvalidReason::NameIsTooLong);
+            return Err(BizErrorEnum::SubscriberNameIsTooLong);
         };
 
         // Iterate over all characters in the input `s` to check if any of them
@@ -34,7 +34,7 @@ impl SubscriberName {
             .chars()
             .any(|a_char| FORBIDDEN_CHARACTERS.contains(&a_char))
         {
-            return Err(InvalidReason::NameContainsForbiddenCharacters);
+            return Err(BizErrorEnum::SubscriberNameContainsIllegalCharacter);
         };
 
         Ok(Self(name))

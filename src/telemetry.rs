@@ -1,3 +1,4 @@
+use crate::error::BizErrorEnum;
 use tracing::{subscriber, Subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
@@ -43,10 +44,17 @@ where
 /// Register a subscriber as global default to process span data.
 ///
 /// It should only be called once!
-pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
+pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) -> Result<(), BizErrorEnum> {
     // Redirect all `log`'s events to our subscriber
-    LogTracer::init().expect("Failed to set logger");
+    LogTracer::init().map_err(|e| {
+        tracing::error!("Failed to set logger");
+        BizErrorEnum::SetLoggerError(e)
+    })?;
     // `set_global_default` can be used by applications to specify
     // what subscriber should be used to process spans.
-    subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+    subscriber::set_global_default(subscriber).map_err(|e| {
+        tracing::error!("Failed to set subscriber");
+        BizErrorEnum::SetSubscriberError(e)
+    })?;
+    Ok(())
 }

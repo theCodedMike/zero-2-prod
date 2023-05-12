@@ -1,4 +1,5 @@
 use crate::domain::SubscriberEmail;
+use crate::error::BizErrorEnum;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, Secret};
 use serde::Serialize;
@@ -40,14 +41,21 @@ impl EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), reqwest::Error> {
+    ) -> Result<(), BizErrorEnum> {
         // You can do better using `reqwest::Url::join` if you change
         // `base_url`'s type from `String` to `reqwest::Url`.
         // I'll leave it as an exercise for the reader!
         let url = Url::parse(&self.base_url)
-            .expect("Failed to parse url")
+            .map_err(|e| {
+                tracing::error!("Failed to parse url: url={}, e={:?}", &self.base_url, e);
+                BizErrorEnum::ParseUrlError
+            })?
             .join("/email")
-            .expect("Failed to join /email");
+            .map_err(|e| {
+                tracing::error!("Url failed to join /email: {:?}", e);
+                BizErrorEnum::JoinUrlError
+            })?;
+
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
             to: recipient.as_ref(),
@@ -60,7 +68,11 @@ impl EmailClient {
             .header(HEADER_KEY, self.authorization_token.expose_secret())
             .json(&request_body)
             .send()
-            .await?
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to send email: {:?}", e);
+                BizErrorEnum::SendEmailError(e)
+            })?
             .error_for_status()?;
         Ok(())
     }

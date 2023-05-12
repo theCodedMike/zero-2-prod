@@ -1,29 +1,29 @@
-use crate::domain::new_subscriber::InvalidReason;
+use crate::error::BizErrorEnum;
 
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
 impl SubscriberEmail {
-    pub fn parse(email: String) -> Result<Self, InvalidReason> {
+    pub fn parse(email: String) -> Result<Self, BizErrorEnum> {
         if email.trim().is_empty() {
-            return Err(InvalidReason::EmailIsEmpty);
+            return Err(BizErrorEnum::SubscriberEmailIsEmpty);
         }
 
         if !email.contains('@') {
-            return Err(InvalidReason::EmailMissingAtSymbol);
+            return Err(BizErrorEnum::SubscriberEmailMissAtSymbol);
         }
 
         let split = email.rsplitn(2, '@').collect::<Vec<&str>>();
         // domain part
         if split[0].is_empty() {
-            return Err(InvalidReason::EmailMissingDomain);
+            return Err(BizErrorEnum::SubscriberEmailMissDomain);
         }
         // user part
         if split[1].is_empty() {
-            return Err(InvalidReason::EmailMissingSubject);
+            return Err(BizErrorEnum::SubscriberEmailMissDomain);
         }
 
         if !validator::validate_email(&email) {
-            return Err(InvalidReason::EmailFormatWrong);
+            return Err(BizErrorEnum::SubscriberEmailFormatIsIncorrect);
         }
 
         Ok(Self(email))

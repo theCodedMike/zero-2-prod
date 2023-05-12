@@ -1,8 +1,7 @@
 use crate::domain::InvalidReason;
-use crate::error::StoreTokenError;
 use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 
 #[derive(thiserror::Error)]
 pub enum SubscribeError {

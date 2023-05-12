@@ -1,5 +1,6 @@
-use crate::domain::{InvalidReason, SubscriberEmail};
-use config::{Config, ConfigError, File};
+use crate::domain::SubscriberEmail;
+use crate::error::BizErrorEnum;
+use config::{Config, File};
 use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
@@ -68,7 +69,7 @@ pub struct EmailClientSettings {
 }
 
 impl EmailClientSettings {
-    pub fn sender(&self) -> Result<SubscriberEmail, InvalidReason> {
+    pub fn sender(&self) -> Result<SubscriberEmail, BizErrorEnum> {
         SubscriberEmail::parse(self.sender_email.clone())
     }
     pub fn timeout(&self) -> Duration {
@@ -76,23 +77,36 @@ impl EmailClientSettings {
     }
 }
 
-pub fn get_configuration() -> Result<Settings, ConfigError> {
-    let base_path = std::env::current_dir().expect("Failed to determine the current directory");
+pub fn get_configuration() -> Result<Settings, BizErrorEnum> {
+    let base_path = std::env::current_dir().map_err(|e| {
+        tracing::error!("Failed to get current dir.");
+        BizErrorEnum::GetCurrentDirError(e)
+    })?;
     let config_dir = base_path.join("configuration");
     // Detect the running environment.
     // Default to `local` if unspecified.
     let environment: Environment = std::env::var("APP_ENVIRONMENT")
         .unwrap_or_else(|_| LOCAL_ENVIRONMENT.into())
         .try_into()
-        .expect("Failed to parse APP_ENVIRONMENT");
+        .map_err(|e| {
+            tracing::error!("Failed to parse APP_ENVIRONMENT: {:?}", e);
+            BizErrorEnum::ParseEnvironmentVariableError(e)
+        })?;
     let environment_filename = format!("{}.yaml", environment.as_str());
     // Initialise our configuration reader
     let settings = Config::builder()
         .add_source(File::from(config_dir.join("base.yaml")))
         .add_source(File::from(config_dir.join(environment_filename)))
-        .build()?;
+        .build()
+        .map_err(|e| {
+            tracing::error!("Failed to build config sources.");
+            BizErrorEnum::BuildConfigSourcesError(e)
+        })?;
     // Try to convert the configuration values it read into our Settings type
-    settings.try_deserialize()
+    settings.try_deserialize().map_err(|e| {
+        tracing::error!("Failed to deserialize config file.");
+        BizErrorEnum::DeserializeConfigurationFileError(e)
+    })
 }
 
 /// The possible runtime environment for our application.
