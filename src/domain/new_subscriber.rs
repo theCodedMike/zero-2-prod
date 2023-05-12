@@ -1,4 +1,5 @@
 use crate::domain::{SubscriberEmail, SubscriberName};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub struct NewSubscriber {
@@ -52,5 +53,11 @@ impl InvalidReason {
             InvalidReason::EmailMissingDomain => "Email missing domain",
             InvalidReason::EmailFormatWrong => "Email's format is not correct",
         }
+    }
+}
+
+impl Display for InvalidReason {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }

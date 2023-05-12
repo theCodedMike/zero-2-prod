@@ -1,4 +1,3 @@
-use std::time::Duration;
 use crate::helpers::TestApp;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};

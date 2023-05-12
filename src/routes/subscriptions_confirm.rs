@@ -42,10 +42,7 @@ async fn get_subscriber_id_from_token(pool: &PgPool, token: &str) -> Result<Opti
     Ok(result.map(|r| r.subscriber_id))
 }
 
-#[tracing::instrument(
-    name = "Update status of subscriptions by subscriber_id",
-    skip(pool)
-)]
+#[tracing::instrument(name = "Update status of subscriptions by subscriber_id", skip(pool))]
 async fn confirm_subscriber(pool: &PgPool, id: Uuid) -> Result<(), Error> {
     sqlx::query!(
         r#"UPDATE subscriptions SET status = 'confirmed' WHERE id = $1"#,
