@@ -88,7 +88,7 @@ impl TestApp {
             .body(body)
             .send()
             .await
-            .expect("Failed to execute request.")
+            .expect("Failed to post subscriptions.")
     }
 
     pub async fn get_health_check(&self) -> Response {
@@ -96,7 +96,16 @@ impl TestApp {
             .get(format!("{}/health_check", &self.address))
             .send()
             .await
-            .expect("Failed to execute request.")
+            .expect("Failed to get health_check.")
+    }
+
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
+        reqwest::Client::new()
+            .post(&format!("{}/newsletters", &self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to post newsletters.")
     }
 
     /// Extract the confirmation links embedded in the request to the email API.

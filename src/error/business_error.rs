@@ -46,17 +46,20 @@ pub enum BizErrorEnum {
     #[error("Failed to insert subscriptions.")]
     InsertSubscriptionsError(#[source] sqlx::Error),
 
+    #[error("Failed to update subscriptions.")]
+    UpdateSubscriptionsError(#[source] sqlx::Error),
+
+    #[error("Failed to query subscriptions.")]
+    QuerySubscriptionsError(#[source] sqlx::Error),
+
     #[error("Failed to insert subscription_tokens.")]
     InsertSubscriptionTokensError(#[source] sqlx::Error),
-
-    #[error("Failed to send a confirmation email.")]
-    SendEmailError(#[from] reqwest::Error),
 
     #[error("Failed to query subscription_tokens")]
     QuerySubscriptionTokensError(#[source] sqlx::Error),
 
-    #[error("Failed to update subscriptions.")]
-    UpdateSubscriptionsError(#[source] sqlx::Error),
+    #[error("Failed to send a confirmation email.")]
+    SendEmailError(#[from] reqwest::Error),
 
     #[error("Failed to bind TcpListener.")]
     BindTcpListenerError(#[source] std::io::Error),

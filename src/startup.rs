@@ -96,6 +96,7 @@ fn run(
             .route("/health_check", web::get().to(routes::health_check))
             .route("/subscriptions", web::post().to(routes::subscribe))
             .route("/subscriptions/confirm", web::get().to(routes::confirm))
+            .route("/newsletters", web::post().to(routes::publish_newsletter))
     })
     .listen(listener)
     .map_err(|e| {
