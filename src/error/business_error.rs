@@ -1,5 +1,7 @@
+use actix_web::body::BoxBody;
+use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
-use actix_web::ResponseError;
+use actix_web::{HttpResponse, ResponseError};
 use std::fmt::{Debug, Formatter};
 
 #[derive(thiserror::Error)]
@@ -87,6 +89,27 @@ pub enum BizErrorEnum {
 
     #[error("Failed to set subscriber.")]
     SetSubscriberError(#[source] tracing::dispatcher::SetGlobalDefaultError),
+
+    #[error("The 'Authorization' header was missing.")]
+    AuthorizationHeaderIsMissing,
+
+    #[error("The 'Authorization' header was not a valid UTF8 string.")]
+    AuthorizationHeaderIsInvalidUtf8String(#[source] actix_web::http::header::ToStrError),
+
+    #[error("The authorization scheme was not 'Basic'.")]
+    AuthorizationSchemeNotBasic,
+
+    #[error("Failed to base64-decode 'Basic' credentials.")]
+    Base64DecodeError(#[source] base64::DecodeError),
+
+    #[error("The decoded credential string is not valid UTF8.")]
+    CredentialStringIsInvalidUtf8String(#[source] std::string::FromUtf8Error),
+
+    #[error("A username must be provided in 'Basic' auth.")]
+    CredentialMissingUsername,
+
+    #[error("A password must be provided in 'Basic' auth.")]
+    CredentialMissingPassword,
 }
 
 impl Debug for BizErrorEnum {
@@ -96,7 +119,10 @@ impl Debug for BizErrorEnum {
 }
 
 impl ResponseError for BizErrorEnum {
-    fn status_code(&self) -> StatusCode {
+    /// `status_code` is invoked by the default `error_response`
+    /// implementation. We are providing a bespoke `error_response` implementation
+    /// therefore there is no need to maintain a `status_code` implementation anymore.
+    /*fn status_code(&self) -> StatusCode {
         match self {
             BizErrorEnum::SubscriberNameIsEmpty
             | BizErrorEnum::SubscriberNameIsTooLong
@@ -106,7 +132,52 @@ impl ResponseError for BizErrorEnum {
             | BizErrorEnum::SubscriberEmailMissSubject
             | BizErrorEnum::SubscriberEmailMissDomain
             | BizErrorEnum::SubscriberEmailFormatIsIncorrect => StatusCode::BAD_REQUEST,
+
+            BizErrorEnum::AuthorizationHeaderIsMissing
+            | BizErrorEnum::AuthorizationHeaderIsInvalidUtf8String(_)
+            | BizErrorEnum::AuthorizationSchemeNotBasic
+            | BizErrorEnum::Base64DecodeError(_)
+            | BizErrorEnum::CredentialStringIsInvalidUtf8String(_)
+            | BizErrorEnum::CredentialMissingUsername
+            | BizErrorEnum::CredentialMissingPassword => StatusCode::UNAUTHORIZED,
+
             _ => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }*/
+
+    fn error_response(&self) -> HttpResponse<BoxBody> {
+        match self {
+            BizErrorEnum::SubscriberNameIsEmpty
+            | BizErrorEnum::SubscriberNameIsTooLong
+            | BizErrorEnum::SubscriberNameContainsIllegalCharacter
+            | BizErrorEnum::SubscriberEmailIsEmpty
+            | BizErrorEnum::SubscriberEmailMissAtSymbol
+            | BizErrorEnum::SubscriberEmailMissSubject
+            | BizErrorEnum::SubscriberEmailMissDomain
+            | BizErrorEnum::SubscriberEmailFormatIsIncorrect => {
+                HttpResponse::new(StatusCode::BAD_REQUEST)
+            }
+
+            BizErrorEnum::AuthorizationHeaderIsMissing
+            | BizErrorEnum::AuthorizationHeaderIsInvalidUtf8String(_)
+            | BizErrorEnum::AuthorizationSchemeNotBasic
+            | BizErrorEnum::Base64DecodeError(_)
+            | BizErrorEnum::CredentialStringIsInvalidUtf8String(_)
+            | BizErrorEnum::CredentialMissingUsername
+            | BizErrorEnum::CredentialMissingPassword => {
+                let mut response = HttpResponse::new(StatusCode::UNAUTHORIZED);
+                let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
+
+                response
+                    .headers_mut()
+                    // actix_web::http::header provides a collection of constants
+                    // for the names of several well-known/standard HTTP headers
+                    .insert(actix_web::http::header::WWW_AUTHENTICATE, header_value);
+
+                response
+            }
+
+            _ => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
         }
     }
 }

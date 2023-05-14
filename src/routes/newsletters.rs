@@ -2,7 +2,10 @@ use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
 use crate::request::BodyData;
-use actix_web::{web, HttpResponse};
+use actix_web::http::header::HeaderMap;
+use actix_web::{web, HttpRequest, HttpResponse};
+use base64::Engine;
+use secrecy::Secret;
 use sqlx::PgPool;
 
 #[tracing::instrument(
@@ -13,7 +16,11 @@ pub async fn publish_newsletter(
     body: web::Json<BodyData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
+    request: HttpRequest,
 ) -> Result<HttpResponse, BizErrorEnum> {
+    // authentication
+    let _credential = basic_authentication(request.headers())?;
+
     // get all confirmed subscriber's email
     let confirmed_emails = get_confirmed_subscribers(&pool).await?;
     if confirmed_emails.is_empty() {
@@ -79,4 +86,45 @@ async fn get_confirmed_subscribers(
         .collect();
 
     Ok(results)
+}
+struct Credentials {
+    username: String,
+    password: Secret<String>,
+}
+/// Password-based Authentication
+///
+/// Authorization: Basic {username}:{password}
+fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, BizErrorEnum> {
+    let header_value = headers
+        .get("Authorization")
+        .ok_or(BizErrorEnum::AuthorizationHeaderIsMissing)?
+        .to_str()
+        .map_err(|e| BizErrorEnum::AuthorizationHeaderIsInvalidUtf8String(e))?;
+    let base64_encoded_segment = header_value
+        .strip_prefix("Basic ")
+        .ok_or(BizErrorEnum::AuthorizationSchemeNotBasic)?;
+
+    let decoded_bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_encoded_segment)
+        .map_err(|e| BizErrorEnum::Base64DecodeError(e))?;
+
+    let decoded_credentials = String::from_utf8(decoded_bytes)
+        .map_err(|e| BizErrorEnum::CredentialStringIsInvalidUtf8String(e))?;
+
+    // Split into two segments, using ':' as delimiter
+    let mut credentials = decoded_credentials.splitn(2, ':');
+
+    let username = credentials
+        .next()
+        .filter(|str| !str.is_empty())
+        .ok_or(BizErrorEnum::CredentialMissingUsername)?;
+    let password = credentials
+        .next()
+        .filter(|str| !str.is_empty())
+        .ok_or(BizErrorEnum::CredentialMissingPassword)?;
+
+    Ok(Credentials {
+        username: username.into(),
+        password: Secret::new(password.into()),
+    })
 }

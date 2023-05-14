@@ -95,6 +95,33 @@ async fn newsletters_returns_400_for_invalid_data() {
     }
 }
 
+#[tokio::test]
+async fn newsletters_requests_missing_authorization_are_rejected() {
+    // Arrange
+    let app = TestApp::spawn_app().await;
+
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "content": {
+            "text": "Newsletter body as plain text",
+            "html": "<p>Newsletter body as HTML</p>"
+        }
+    });
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletters", &app.address))
+        .json(&body)
+        .send()
+        .await
+        .expect("Failed to post newsletters.");
+
+    // Assert
+    assert_eq!(401, response.status().as_u16());
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        response.headers()["WWW-Authenticate"]
+    );
+}
+
 /// Use the public API of the application under test to create
 /// an unconfirmed subscriber.
 ///
