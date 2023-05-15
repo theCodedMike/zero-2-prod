@@ -1,11 +1,10 @@
+use crate::constant::HEADER_KEY;
 use crate::domain::SubscriberEmail;
 use crate::error::BizErrorEnum;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, Secret};
 use serde::Serialize;
 use std::time::Duration;
-
-const HEADER_KEY: &str = "X-Postmark-Server-Token";
 
 #[derive(Debug)]
 pub struct EmailClient {

@@ -1,3 +1,4 @@
+use crate::constant::{LOCAL_ENVIRONMENT, PRODUCTION_ENVIRONMENT};
 use crate::domain::SubscriberEmail;
 use crate::error::BizErrorEnum;
 use config::{Config, File};
@@ -8,9 +9,6 @@ use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
 use std::time::Duration;
 use tracing::log::LevelFilter;
-
-const LOCAL_ENVIRONMENT: &str = "local";
-const PRODUCTION_ENVIRONMENT: &str = "production";
 
 #[derive(Deserialize, Clone)]
 pub struct Settings {

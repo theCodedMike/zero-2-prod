@@ -1,3 +1,4 @@
+use crate::constant::{DELIMITER, SALT};
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
@@ -6,6 +7,7 @@ use actix_web::http::header::HeaderMap;
 use actix_web::{web, HttpRequest, HttpResponse};
 use base64::Engine;
 use secrecy::{ExposeSecret, Secret};
+use sha3::Digest;
 use sqlx::PgPool;
 
 #[tracing::instrument(
@@ -153,12 +155,24 @@ async fn validate_credentials(
     credentials: &Credentials,
     pool: &PgPool,
 ) -> Result<uuid::Uuid, BizErrorEnum> {
+    // generate password_hash
+    let raw_password_and_salt = format!(
+        "{}{}{}",
+        credentials.password.expose_secret(),
+        DELIMITER,
+        SALT
+    );
+    let raw_password_hash = sha3::Sha3_256::digest(raw_password_and_salt.as_ref());
+    // Uppercase hexadecimal encoding.
+    let password_hash = format!("{:X}", raw_password_hash);
+
+    // query user_id from table
     let user_id = sqlx::query!(
         r#"
-        SELECT user_id FROM users WHERE username = $1 AND password = $2
+        SELECT user_id FROM users WHERE username = $1 AND password_hash = $2
     "#,
         &credentials.username,
-        credentials.password.expose_secret()
+        password_hash
     )
     .fetch_optional(pool)
     .await
@@ -167,6 +181,7 @@ async fn validate_credentials(
         BizErrorEnum::QueryUsersError(e)
     })?;
 
+    // convert
     user_id
         .map(|row| row.user_id)
         .ok_or(BizErrorEnum::InvalidUsernameOrPassword)

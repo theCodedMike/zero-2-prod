@@ -1,7 +1,6 @@
+use crate::constant::FORBIDDEN_CHARACTERS;
 use crate::error::BizErrorEnum;
 use unicode_segmentation::UnicodeSegmentation;
-
-const FORBIDDEN_CHARACTERS: [char; 9] = ['/', '(', ')', '"', '<', '>', '\\', '{', '}'];
 
 #[derive(Debug)]
 pub struct SubscriberName(String);

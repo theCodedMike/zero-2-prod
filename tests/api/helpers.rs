@@ -1,11 +1,13 @@
 use linkify::{LinkFinder, LinkKind};
 use once_cell::sync::Lazy;
 use reqwest::{Response, Url};
+use sha3::Digest;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero_2_prod::configuration;
 use zero_2_prod::configuration::DatabaseSettings;
+use zero_2_prod::constant::{DELIMITER, SALT};
 use zero_2_prod::telemetry;
 use zero_2_prod::{startup, startup::Application};
 
@@ -27,6 +29,7 @@ pub struct TestApp {
     pub connect_pool: PgPool,
     pub email_server: MockServer,
     pub port: u16,
+    pub test_user: TestUser,
 }
 
 impl TestApp {
@@ -78,8 +81,9 @@ impl TestApp {
             connect_pool: startup::get_connection_pool(&configuration.database),
             email_server,
             port: app_port,
+            test_user: TestUser::new(),
         };
-        add_test_user(&test_app.connect_pool).await;
+        test_app.test_user.store(&test_app.connect_pool).await;
         test_app
     }
 
@@ -102,11 +106,10 @@ impl TestApp {
     }
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
-        let (username, password) = self.get_test_user().await;
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
             // No longer randomly generated on the spot!
-            .basic_auth(username, Some(password))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
@@ -146,15 +149,6 @@ impl TestApp {
             plain_text: text_link,
         }
     }
-
-    pub async fn get_test_user(&self) -> (String, String) {
-        let record = sqlx::query!("SELECT username, password FROM users LIMIT 1")
-            .fetch_one(&self.connect_pool)
-            .await
-            .expect("Failed to query username and password");
-
-        (record.username, record.password)
-    }
 }
 
 /// create a database then migrate a table
@@ -185,16 +179,35 @@ pub struct ConfirmationLinks {
     pub plain_text: Url,
 }
 
-async fn add_test_user(pool: &PgPool) {
-    sqlx::query!(
-        r#"
-        INSERT INTO users(user_id, username, password) VALUES ($1, $2, $3)
-    "#,
-        Uuid::new_v4(),
-        Uuid::new_v4().to_string(),
-        Uuid::new_v4().to_string()
-    )
-    .execute(pool)
-    .await
-    .expect("Failed to create test users.");
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String,
+}
+
+impl TestUser {
+    pub fn new() -> Self {
+        Self {
+            user_id: Uuid::new_v4(),
+            username: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+        }
+    }
+
+    async fn store(&self, pool: &PgPool) {
+        let raw_password_and_salt = format!("{}{}{}", self.password, DELIMITER, SALT);
+        let raw_password_hash = sha3::Sha3_256::digest(raw_password_and_salt.as_bytes());
+        let password_hash = format!("{:X}", raw_password_hash);
+        sqlx::query!(
+            r#"
+            INSERT INTO users(user_id, username, password_hash) VALUES ($1, $2, $3)
+        "#,
+            self.user_id,
+            self.username,
+            password_hash
+        )
+        .execute(pool)
+        .await
+        .expect("Failed to create test user.");
+    }
 }
