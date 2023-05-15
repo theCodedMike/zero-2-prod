@@ -57,4 +57,5 @@ rand = { version = "0.8", features = ["std_rng"] } # generate token
 thiserror = "1" # error handling: generate From template code
 anyhow = "1" # error handling
 base64 = "0.21"
-sha3 = "0.9" # encrypt password
+# sha3 = "0.9" # encrypt password
+argon2 = { version = "0.5", features = ["std"] } # encrypt password

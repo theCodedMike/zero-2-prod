@@ -1,13 +1,13 @@
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
 use linkify::{LinkFinder, LinkKind};
 use once_cell::sync::Lazy;
 use reqwest::{Response, Url};
-use sha3::Digest;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero_2_prod::configuration;
 use zero_2_prod::configuration::DatabaseSettings;
-use zero_2_prod::constant::{DELIMITER, SALT};
 use zero_2_prod::telemetry;
 use zero_2_prod::{startup, startup::Application};
 
@@ -195,9 +195,13 @@ impl TestUser {
     }
 
     async fn store(&self, pool: &PgPool) {
-        let raw_password_and_salt = format!("{}{}{}", self.password, DELIMITER, SALT);
-        let raw_password_hash = sha3::Sha3_256::digest(raw_password_and_salt.as_bytes());
-        let password_hash = format!("{:X}", raw_password_hash);
+        let salt = SaltString::generate(&mut rand::thread_rng());
+
+        let password_hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)
+            .expect("Failed to hash password")
+            .to_string();
+
         sqlx::query!(
             r#"
             INSERT INTO users(user_id, username, password_hash) VALUES ($1, $2, $3)

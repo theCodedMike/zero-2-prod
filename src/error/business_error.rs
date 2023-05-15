@@ -2,6 +2,7 @@ use actix_web::body::BoxBody;
 use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
+use argon2::password_hash;
 use std::fmt::{Debug, Formatter};
 
 #[derive(thiserror::Error)]
@@ -67,8 +68,11 @@ pub enum BizErrorEnum {
     #[error("A password must be provided in 'Basic' auth.")]
     CredentialMissingPassword,
 
-    #[error("Invalid username or password.")]
-    InvalidUsernameOrPassword,
+    #[error("Invalid username.")]
+    InvalidUsername,
+
+    #[error("Invalid password.")]
+    InvalidPassword(#[source] password_hash::Error),
 
     // VALIDATE DATABASE ACCESS
     #[error("Subscription_token is invalid.")]
@@ -128,6 +132,13 @@ pub enum BizErrorEnum {
 
     #[error("Failed to set subscriber.")]
     SetSubscriberError(#[source] tracing::dispatcher::SetGlobalDefaultError),
+
+    #[error("Failed to spawn blocking task.")]
+    SpawnBlockingTaskError(#[source] tokio::task::JoinError),
+
+    // Argon
+    #[error("Failed to parse hash in PHC string format.")]
+    Argon2HashParseError(#[source] password_hash::Error),
 }
 
 impl Debug for BizErrorEnum {
@@ -183,7 +194,9 @@ impl ResponseError for BizErrorEnum {
             | BizErrorEnum::CredentialStringIsInvalidUtf8String(_)
             | BizErrorEnum::CredentialMissingUsername
             | BizErrorEnum::CredentialMissingPassword
-            | BizErrorEnum::InvalidUsernameOrPassword => {
+            | BizErrorEnum::InvalidUsername
+            | BizErrorEnum::InvalidPassword(_)
+            | BizErrorEnum::Argon2HashParseError(_) => {
                 let mut response = HttpResponse::new(StatusCode::UNAUTHORIZED);
                 let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
 
