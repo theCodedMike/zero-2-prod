@@ -5,12 +5,13 @@ use crate::request::BodyData;
 use actix_web::http::header::HeaderMap;
 use actix_web::{web, HttpRequest, HttpResponse};
 use base64::Engine;
-use secrecy::Secret;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 
 #[tracing::instrument(
-    name = "Publish newsletter to all confirmed subscribers",
-    skip(body, pool, email_client)
+    name = "Publish a newsletter issue",
+    skip(body, pool, email_client, request),
+    fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
     body: web::Json<BodyData>,
@@ -18,8 +19,24 @@ pub async fn publish_newsletter(
     email_client: web::Data<EmailClient>,
     request: HttpRequest,
 ) -> Result<HttpResponse, BizErrorEnum> {
-    // authentication
-    let _credential = basic_authentication(request.headers())?;
+    // get credential from headers
+    let credential = basic_authentication(request.headers())?;
+    tracing::Span::current().record("username", &tracing::field::display(&credential.username));
+
+    // validate username and password
+    let uuid = validate_credentials(&credential, &pool).await?;
+    tracing::Span::current().record("user_id", &tracing::field::display(&uuid));
+
+    // validate body
+    let body_data = body.into_inner();
+    if body_data.is_title_blank() {
+        tracing::error!("Newsletter's title is empty.");
+        return Err(BizErrorEnum::NewsletterTitleIsEmpty);
+    }
+    if body_data.is_content_blank() {
+        tracing::error!("Newsletter's content is empty.");
+        return Err(BizErrorEnum::NewsletterContentIsEmpty);
+    }
 
     // get all confirmed subscriber's email
     let confirmed_emails = get_confirmed_subscribers(&pool).await?;
@@ -29,7 +46,6 @@ pub async fn publish_newsletter(
     }
 
     // send email
-    let body_data = body.into_inner();
     for subscriber in confirmed_emails {
         email_client
             .send_email(
@@ -87,6 +103,8 @@ async fn get_confirmed_subscribers(
 
     Ok(results)
 }
+
+#[derive(Debug)]
 struct Credentials {
     username: String,
     password: Secret<String>,
@@ -94,6 +112,7 @@ struct Credentials {
 /// Password-based Authentication
 ///
 /// Authorization: Basic {username}:{password}
+#[tracing::instrument(name = "Get credentials from headers", skip(headers))]
 fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, BizErrorEnum> {
     let header_value = headers
         .get("Authorization")
@@ -127,4 +146,28 @@ fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, BizErrorEnum
         username: username.into(),
         password: Secret::new(password.into()),
     })
+}
+
+#[tracing::instrument(name = "Query users by username and password", skip(pool))]
+async fn validate_credentials(
+    credentials: &Credentials,
+    pool: &PgPool,
+) -> Result<uuid::Uuid, BizErrorEnum> {
+    let user_id = sqlx::query!(
+        r#"
+        SELECT user_id FROM users WHERE username = $1 AND password = $2
+    "#,
+        &credentials.username,
+        credentials.password.expose_secret()
+    )
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to query users table: {:?}", e);
+        BizErrorEnum::QueryUsersError(e)
+    })?;
+
+    user_id
+        .map(|row| row.user_id)
+        .ok_or(BizErrorEnum::InvalidUsernameOrPassword)
 }

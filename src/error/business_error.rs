@@ -6,6 +6,7 @@ use std::fmt::{Debug, Formatter};
 
 #[derive(thiserror::Error)]
 pub enum BizErrorEnum {
+    // VALIDATE SUBSCRIBER'S NAME AND EMAIL
     #[error("Subscriber's name is empty.")]
     SubscriberNameIsEmpty,
 
@@ -30,12 +31,46 @@ pub enum BizErrorEnum {
     #[error("Subscriber's email format is incorrect.")]
     SubscriberEmailFormatIsIncorrect,
 
+    // VALIDATE NEWSLETTER'S TITLE AND CONTENT
+    #[error("Newsletter's title is empty.")]
+    NewsletterTitleIsEmpty,
+
+    #[error("Newsletter's content is empty.")]
+    NewsletterContentIsEmpty,
+
+    // VALIDATE URL
     #[error("Url is incorrect.")]
     ParseUrlError,
 
     #[error("Url join path error.")]
     JoinUrlError,
 
+    // VALIDATE AUTH
+    #[error("The 'Authorization' header was missing.")]
+    AuthorizationHeaderIsMissing,
+
+    #[error("The 'Authorization' header was not a valid UTF8 string.")]
+    AuthorizationHeaderIsInvalidUtf8String(#[source] actix_web::http::header::ToStrError),
+
+    #[error("The authorization scheme was not 'Basic'.")]
+    AuthorizationSchemeNotBasic,
+
+    #[error("Failed to base64-decode 'Basic' credentials.")]
+    Base64DecodeError(#[source] base64::DecodeError),
+
+    #[error("The decoded credential string is not valid UTF8.")]
+    CredentialStringIsInvalidUtf8String(#[source] std::string::FromUtf8Error),
+
+    #[error("A username must be provided in 'Basic' auth.")]
+    CredentialMissingUsername,
+
+    #[error("A password must be provided in 'Basic' auth.")]
+    CredentialMissingPassword,
+
+    #[error("Invalid username or password.")]
+    InvalidUsernameOrPassword,
+
+    // VALIDATE DATABASE ACCESS
     #[error("Subscription_token is invalid.")]
     SubscriptionTokenInvalidError,
 
@@ -60,6 +95,10 @@ pub enum BizErrorEnum {
     #[error("Failed to query subscription_tokens")]
     QuerySubscriptionTokensError(#[source] sqlx::Error),
 
+    #[error("Failed to query users.")]
+    QueryUsersError(#[source] sqlx::Error),
+
+    // OTHER
     #[error("Failed to send a confirmation email.")]
     SendEmailError(#[from] reqwest::Error),
 
@@ -89,27 +128,6 @@ pub enum BizErrorEnum {
 
     #[error("Failed to set subscriber.")]
     SetSubscriberError(#[source] tracing::dispatcher::SetGlobalDefaultError),
-
-    #[error("The 'Authorization' header was missing.")]
-    AuthorizationHeaderIsMissing,
-
-    #[error("The 'Authorization' header was not a valid UTF8 string.")]
-    AuthorizationHeaderIsInvalidUtf8String(#[source] actix_web::http::header::ToStrError),
-
-    #[error("The authorization scheme was not 'Basic'.")]
-    AuthorizationSchemeNotBasic,
-
-    #[error("Failed to base64-decode 'Basic' credentials.")]
-    Base64DecodeError(#[source] base64::DecodeError),
-
-    #[error("The decoded credential string is not valid UTF8.")]
-    CredentialStringIsInvalidUtf8String(#[source] std::string::FromUtf8Error),
-
-    #[error("A username must be provided in 'Basic' auth.")]
-    CredentialMissingUsername,
-
-    #[error("A password must be provided in 'Basic' auth.")]
-    CredentialMissingPassword,
 }
 
 impl Debug for BizErrorEnum {
@@ -154,9 +172,9 @@ impl ResponseError for BizErrorEnum {
             | BizErrorEnum::SubscriberEmailMissAtSymbol
             | BizErrorEnum::SubscriberEmailMissSubject
             | BizErrorEnum::SubscriberEmailMissDomain
-            | BizErrorEnum::SubscriberEmailFormatIsIncorrect => {
-                HttpResponse::new(StatusCode::BAD_REQUEST)
-            }
+            | BizErrorEnum::SubscriberEmailFormatIsIncorrect
+            | BizErrorEnum::NewsletterTitleIsEmpty
+            | BizErrorEnum::NewsletterContentIsEmpty => HttpResponse::new(StatusCode::BAD_REQUEST),
 
             BizErrorEnum::AuthorizationHeaderIsMissing
             | BizErrorEnum::AuthorizationHeaderIsInvalidUtf8String(_)
@@ -164,7 +182,8 @@ impl ResponseError for BizErrorEnum {
             | BizErrorEnum::Base64DecodeError(_)
             | BizErrorEnum::CredentialStringIsInvalidUtf8String(_)
             | BizErrorEnum::CredentialMissingUsername
-            | BizErrorEnum::CredentialMissingPassword => {
+            | BizErrorEnum::CredentialMissingPassword
+            | BizErrorEnum::InvalidUsernameOrPassword => {
                 let mut response = HttpResponse::new(StatusCode::UNAUTHORIZED);
                 let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
 
