@@ -1,13 +1,13 @@
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
-use crate::request::BodyData;
+use crate::request::NewsletterData;
 use crate::telemetry;
+use crate::{auth, auth::Credentials};
 use actix_web::http::header::HeaderMap;
 use actix_web::{web, HttpRequest, HttpResponse};
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use base64::Engine;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::Secret;
 use sqlx::PgPool;
 
 #[tracing::instrument(
@@ -16,18 +16,18 @@ use sqlx::PgPool;
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
-    body: web::Json<BodyData>,
+    body: web::Json<NewsletterData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     request: HttpRequest,
 ) -> Result<HttpResponse, BizErrorEnum> {
     // get credential from headers
     let credential = basic_authentication(request.headers())?;
-    tracing::Span::current().record("username", &tracing::field::display(&credential.username));
+    telemetry::record_field("username", &credential.username);
 
     // validate username and password
-    let uuid = validate_credentials(credential, &pool).await?;
-    tracing::Span::current().record("user_id", &tracing::field::display(&uuid));
+    let user_id = auth::validate_credentials(credential, &pool).await?;
+    telemetry::record_field("user_id", &user_id);
 
     // validate body
     let body_data = body.into_inner();
@@ -106,11 +106,6 @@ async fn get_confirmed_subscribers(
     Ok(results)
 }
 
-#[derive(Debug)]
-struct Credentials {
-    username: String,
-    password: Secret<String>,
-}
 /// Password-based Authentication
 ///
 /// Authorization: Basic {username}:{password}
@@ -148,68 +143,4 @@ fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, BizErrorEnum
         username: username.into(),
         password: Secret::new(password.into()),
     })
-}
-
-#[tracing::instrument(name = "Validate credentials", skip(credentials, pool))]
-async fn validate_credentials(
-    credentials: Credentials,
-    pool: &PgPool,
-) -> Result<uuid::Uuid, BizErrorEnum> {
-    // query user_id, password_hash from table
-    let (user_id, password_hash_from_db) = get_stored_credentials(&credentials.username, pool)
-        .await?
-        .ok_or(BizErrorEnum::InvalidUsername)?;
-
-    // PHC string format takes care of salt for us, implicitly
-    // Offload CPU-intensive task to a separate thread-pool using tokio::task::spawn_blocking.
-    telemetry::spawn_blocking_with_tracing(move || {
-        verify_password_hash(password_hash_from_db, credentials.password)
-    })
-    .await
-    // spawn_blocking is fallible - we have a nested Result here!
-    .map_err(|e| BizErrorEnum::SpawnBlockingTaskError(e))??;
-
-    Ok(user_id)
-}
-
-#[tracing::instrument(name = "Get stored credentials", skip(pool))]
-async fn get_stored_credentials(
-    username: &str,
-    pool: &PgPool,
-) -> Result<Option<(uuid::Uuid, Secret<String>)>, BizErrorEnum> {
-    let row = sqlx::query!(
-        r#"
-        SELECT user_id, password_hash FROM users WHERE username = $1
-    "#,
-        username
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to query users table: {:?}", e);
-        BizErrorEnum::QueryUsersError(e)
-    })?
-    .map(|row| (row.user_id, Secret::new(row.password_hash)));
-
-    Ok(row)
-}
-
-#[tracing::instrument(
-    name = "Verify password hash",
-    skip(password_hash_from_db, password_from_user)
-)]
-fn verify_password_hash(
-    password_hash_from_db: Secret<String>,
-    password_from_user: Secret<String>,
-) -> Result<(), BizErrorEnum> {
-    // parse hash in PHC string format
-    let expected_password_hash = PasswordHash::new(&password_hash_from_db.expose_secret())
-        .map_err(|e| BizErrorEnum::Argon2HashParseError(e))?;
-    Argon2::default()
-        .verify_password(
-            password_from_user.expose_secret().as_bytes(),
-            &expected_password_hash,
-        )
-        .map_err(|e| BizErrorEnum::InvalidPassword(e))?;
-    Ok(())
 }

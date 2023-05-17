@@ -59,3 +59,8 @@ anyhow = "1" # error handling
 base64 = "0.21"
 # sha3 = "0.9" # encrypt password
 argon2 = { version = "0.5", features = ["std"] } # encrypt password
+urlencoding = "2"
+htmlescape = "0.3" # XSS
+hmac = { version = "0.12", features = ["std"] } # encrypt query parameter
+sha2 = "0.10"
+hex = "0.4"

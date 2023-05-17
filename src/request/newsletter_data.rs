@@ -2,12 +2,12 @@ use crate::util;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-pub struct BodyData {
+pub struct NewsletterData {
     pub title: String,
     pub content: Content,
 }
 
-impl BodyData {
+impl NewsletterData {
     pub fn is_title_blank(&self) -> bool {
         util::is_blank(&self.title)
     }

@@ -1,7 +1,7 @@
 use crate::domain::NewSubscriber;
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
-use crate::request::FormData;
+use crate::request::SubscribeData;
 use crate::startup::ApplicationBaseUrl;
 use actix_web::{web, HttpResponse};
 use chrono::Local;
@@ -19,7 +19,7 @@ use uuid::Uuid;
     )
 )]
 pub async fn subscribe(
-    form: web::Form<FormData>,
+    form: web::Form<SubscribeData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     app_base_url: web::Data<ApplicationBaseUrl>,

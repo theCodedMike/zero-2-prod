@@ -4,6 +4,7 @@ use crate::error::BizErrorEnum;
 use crate::routes;
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
+use secrecy::Secret;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::net::TcpListener;
@@ -41,7 +42,13 @@ impl Application {
         })?;
         let port = listener.local_addr().unwrap().port();
 
-        let server = run(listener, pg_pool, email_client, config.application.base_url)?;
+        let server = run(
+            listener,
+            pg_pool,
+            email_client,
+            config.application.base_url,
+            config.application.hmac_secret,
+        )?;
 
         // We "save" the bound port in one of `Application`'s fields
         Ok(Self { port, server })
@@ -73,6 +80,7 @@ fn run(
     pg_pool: PgPool,
     email_client: EmailClient,
     app_base_url: String,
+    hmac_secret: Secret<String>,
 ) -> Result<Server, BizErrorEnum> {
     // Wrap the connection in a smart pointer
     let connect_pool = web::Data::new(pg_pool);
@@ -82,6 +90,8 @@ fn run(
 
     // Use at sending confirmation email
     let app_base_url = web::Data::new(ApplicationBaseUrl(app_base_url));
+
+    // Hmac secret
 
     // Capture `connection` from the surrounding environment
     let server = HttpServer::new(move || {
@@ -93,7 +103,11 @@ fn run(
             .app_data(connect_pool.clone())
             .app_data(email_client.clone())
             .app_data(app_base_url.clone())
+            .app_data(web::Data::new(HmacSecret(hmac_secret.clone())))
             .route("/health_check", web::get().to(routes::health_check))
+            .route("/", web::get().to(routes::home))
+            .route("/login", web::get().to(routes::login_form))
+            .route("/login", web::post().to(routes::login))
             .route("/subscriptions", web::post().to(routes::subscribe))
             .route("/subscriptions/confirm", web::get().to(routes::confirm))
             .route("/newsletters", web::post().to(routes::publish_newsletter))
@@ -114,3 +128,6 @@ pub fn get_connection_pool(config: &DatabaseSettings) -> PgPool {
         .acquire_timeout(Duration::from_secs(5))
         .connect_lazy_with(config.with_db())
 }
+
+#[derive(Debug, Clone)]
+pub struct HmacSecret(pub Secret<String>);

@@ -1,4 +1,5 @@
 use crate::error::BizErrorEnum;
+use std::fmt::Display;
 use tokio::task::JoinHandle;
 use tracing::{subscriber, Subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -67,4 +68,11 @@ where
 {
     let current_span = tracing::Span::current();
     tokio::task::spawn_blocking(move || current_span.in_scope(f))
+}
+
+pub fn record_field<T>(filed: &str, t: T)
+where
+    T: Display,
+{
+    tracing::Span::current().record(filed, &tracing::field::display(t));
 }

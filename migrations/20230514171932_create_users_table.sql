@@ -1,3 +1,5 @@
+-- sqlx migrate add create_users_table
+
 -- Add migration script here
 CREATE TABLE users
 (

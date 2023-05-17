@@ -139,6 +139,15 @@ pub enum BizErrorEnum {
     // Argon
     #[error("Failed to parse hash in PHC string format.")]
     Argon2HashParseError(#[source] password_hash::Error),
+
+    #[error("Failed to generate hmac instance.")]
+    HmacGenerateError(#[source] hmac::digest::InvalidLength),
+
+    #[error("Failed to parse hmac tag")]
+    HexStringDecodedError(#[source] hex::FromHexError),
+
+    #[error("Failed to verify hmac tag")]
+    HmacVerifySliceError(#[source] hmac::digest::MacError),
 }
 
 impl Debug for BizErrorEnum {
@@ -148,8 +157,8 @@ impl Debug for BizErrorEnum {
 }
 
 impl ResponseError for BizErrorEnum {
-    /// `status_code` is invoked by the default `error_response`
-    /// implementation. We are providing a bespoke `error_response` implementation
+    /// `status_code` is invoked by the default `error_response` implementation.
+    /// We are providing a bespoke `error_response` implementation
     /// therefore there is no need to maintain a `status_code` implementation anymore.
     /*fn status_code(&self) -> StatusCode {
         match self {
@@ -195,8 +204,7 @@ impl ResponseError for BizErrorEnum {
             | BizErrorEnum::CredentialMissingUsername
             | BizErrorEnum::CredentialMissingPassword
             | BizErrorEnum::InvalidUsername
-            | BizErrorEnum::InvalidPassword(_)
-            | BizErrorEnum::Argon2HashParseError(_) => {
+            | BizErrorEnum::InvalidPassword(_) => {
                 let mut response = HttpResponse::new(StatusCode::UNAUTHORIZED);
                 let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
 
