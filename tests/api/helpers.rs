@@ -30,6 +30,7 @@ pub struct TestApp {
     pub email_server: MockServer,
     pub port: u16,
     pub test_user: TestUser,
+    pub api_client: reqwest::Client,
 }
 
 impl TestApp {
@@ -75,6 +76,12 @@ impl TestApp {
         // but we have no use for it here, hence the non-binding let
         let _ = tokio::spawn(application.run_until_stopped());
 
+        let client = reqwest::Client::builder()
+            // By default, a Client will automatically handle HTTP redirects
+            .redirect(reqwest::redirect::Policy::none())
+            .cookie_store(true)
+            .build()
+            .expect("Failed to build client instance");
         // We return the application address to the caller!
         let test_app = TestApp {
             address: format!("http://127.0.0.1:{}", app_port),
@@ -82,13 +89,14 @@ impl TestApp {
             email_server,
             port: app_port,
             test_user: TestUser::new(),
+            api_client: client,
         };
         test_app.test_user.store(&test_app.connect_pool).await;
         test_app
     }
 
     pub async fn post_subscriptions(&self, body: String) -> Response {
-        reqwest::Client::new()
+        self.api_client
             .post(format!("{}/subscriptions", &self.address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
@@ -98,7 +106,7 @@ impl TestApp {
     }
 
     pub async fn get_health_check(&self) -> Response {
-        reqwest::Client::new()
+        self.api_client
             .get(format!("{}/health_check", &self.address))
             .send()
             .await
@@ -106,7 +114,7 @@ impl TestApp {
     }
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
-        reqwest::Client::new()
+        self.api_client
             .post(&format!("{}/newsletters", &self.address))
             // No longer randomly generated on the spot!
             .basic_auth(&self.test_user.username, Some(&self.test_user.password))
@@ -114,6 +122,30 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to post newsletters.")
+    }
+
+    pub async fn post_login<Body>(&self, body: &Body) -> Response
+    where
+        Body: serde::Serialize,
+    {
+        self.api_client
+            .post(format!("{}/login", &self.address))
+            .form(body)
+            .send()
+            .await
+            .expect("Failed to post login.")
+    }
+    // Our tests will only look at the HTML page, therefore
+    // we do not expose the underlying reqwest::Response
+    pub async fn get_login_html(&self) -> String {
+        self.api_client
+            .get(&format!("{}/login", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+            .text()
+            .await
+            .expect("Failed to get login html.")
     }
 
     /// Extract the confirmation links embedded in the request to the email API.
@@ -149,6 +181,11 @@ impl TestApp {
             plain_text: text_link,
         }
     }
+}
+
+pub fn assert_is_redirect_to(response: &Response, location: &str) {
+    assert_eq!(response.status().as_u16(), 303);
+    assert_eq!(response.headers().get("Location").unwrap(), location);
 }
 
 /// create a database then migrate a table

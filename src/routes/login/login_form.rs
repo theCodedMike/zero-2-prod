@@ -1,15 +1,13 @@
-use crate::request::ErrorData;
-use crate::startup::HmacSecret;
+use crate::constant::LOGIN_ERROR_MSG;
+use actix_web::cookie::Cookie;
 use actix_web::http::header::ContentType;
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpRequest, HttpResponse};
+use tracing_log::log::trace;
 
-#[tracing::instrument(name = "Get login page", skip(query, secret))]
-pub async fn login_form(
-    query: Option<web::Query<ErrorData>>,
-    secret: web::Data<HmacSecret>,
-) -> HttpResponse {
+#[tracing::instrument(name = "Get login page", skip(request))]
+pub async fn login_form(request: HttpRequest) -> HttpResponse {
     // HMAC to verify integrity and provenance for our query parameters
-    let error_msg = match query {
+    /*let error_msg = match query {
         None => "".into(),
         Some(query) => match query.into_inner().verify(&secret) {
             Ok(error) => {
@@ -23,10 +21,32 @@ pub async fn login_form(
                 "".into()
             }
         },
+    };*/
+    // Use cookie
+    let error_msg = match request.cookie(LOGIN_ERROR_MSG) {
+        None => "".into(),
+        Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
     };
     let login_page = include_str!("login.html").replace("{}", &error_msg);
 
-    HttpResponse::Ok()
+    // Response Headers:
+    // set-cookie: login_error_msg=; Max-Age=0
+    let mut response = HttpResponse::Ok()
         .content_type(ContentType::html())
-        .body(login_page)
+        // 等价于
+        //.cookie(
+        //    Cookie::build(LOGIN_ERROR_MSG, "")
+        //        .max_age(Duration::ZERO)
+        //        .finish(),
+        //)
+        .body(login_page);
+
+    response
+        .add_removal_cookie(&Cookie::new(LOGIN_ERROR_MSG, ""))
+        .map_err(|e| {
+            trace!("Failed to add removal cookie: {:?}", e);
+        })
+        .unwrap();
+
+    response
 }

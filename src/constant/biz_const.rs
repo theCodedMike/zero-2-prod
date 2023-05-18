@@ -7,3 +7,6 @@ pub const FORBIDDEN_CHARACTERS: [char; 9] = ['/', '(', ')', '"', '<', '>', '\\',
 
 /// http request header's key
 pub const HEADER_KEY: &str = "X-Postmark-Server-Token";
+
+/// login error msg
+pub const LOGIN_ERROR_MSG: &str = "login_error_msg";
