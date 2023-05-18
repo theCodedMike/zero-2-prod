@@ -1,12 +1,13 @@
 use crate::auth;
 use crate::auth::Credentials;
-use crate::constant::LOGIN_ERROR_MSG;
+// use crate::constant::LOGIN_ERROR_MSG;
 use crate::error::BizErrorEnum;
 use crate::request::LoginData;
 use crate::telemetry;
-use actix_web::cookie::Cookie;
+// use actix_web::cookie::Cookie;
 use actix_web::http::header::LOCATION;
 use actix_web::{web, HttpResponse};
+use actix_web_flash_messages::FlashMessage;
 use sqlx::PgPool;
 
 /// HMAC: hash-based message authentication code
@@ -57,11 +58,13 @@ pub async fn login(
                 //
                 // Response Headers:
                 // set-cookie: login_error_msg=Invalid username.
+
+                FlashMessage::error(error.to_string()).send();
                 Ok(HttpResponse::SeeOther()
                     .insert_header((LOCATION, "/login"))
                     //.insert_header(("Set-Cookie", format!("login_error_msg={}", error)))
                     // 等价于
-                    .cookie(Cookie::new(LOGIN_ERROR_MSG, error.to_string()))
+                    //.cookie(Cookie::new(LOGIN_ERROR_MSG, error.to_string()))
                     .finish())
             }
             _ => Err(error),

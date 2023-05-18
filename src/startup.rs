@@ -2,9 +2,12 @@ use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
 use crate::routes;
+use actix_web::cookie::Key;
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
-use secrecy::Secret;
+use actix_web_flash_messages::storage::CookieMessageStore;
+use actix_web_flash_messages::FlashMessagesFramework;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::net::TcpListener;
@@ -91,12 +94,16 @@ fn run(
     // Use at sending confirmation email
     let app_base_url = web::Data::new(ApplicationBaseUrl(app_base_url));
 
-    // Hmac secret
+    // Flash message, CookieMessageStore enforces that the cookie used as storage is signed
+    let message_store =
+        CookieMessageStore::builder(Key::from(hmac_secret.expose_secret().as_bytes())).build();
+    let message_framework = FlashMessagesFramework::builder(message_store).build();
 
     // Capture `connection` from the surrounding environment
     let server = HttpServer::new(move || {
         App::new()
             // Middlewares are added using the `wrap` method on `App`
+            .wrap(message_framework.clone())
             .wrap(TracingLogger::default())
             // Register the connection as part of the application state
             // Get a pointer copy and attach it to the application state

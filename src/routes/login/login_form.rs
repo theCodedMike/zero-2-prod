@@ -1,11 +1,14 @@
-use crate::constant::LOGIN_ERROR_MSG;
-use actix_web::cookie::Cookie;
+// use crate::constant::LOGIN_ERROR_MSG;
+// use actix_web::cookie::Cookie;
 use actix_web::http::header::ContentType;
-use actix_web::{HttpRequest, HttpResponse};
-use tracing_log::log::trace;
+use actix_web::HttpResponse;
+use actix_web_flash_messages::IncomingFlashMessages;
+use actix_web_flash_messages::Level::Error;
+// use tracing_log::log::trace;
+use std::fmt::Write;
 
-#[tracing::instrument(name = "Get login page", skip(request))]
-pub async fn login_form(request: HttpRequest) -> HttpResponse {
+#[tracing::instrument(name = "Get login page", skip(flash_msgs))]
+pub async fn login_form(flash_msgs: IncomingFlashMessages) -> HttpResponse {
     // HMAC to verify integrity and provenance for our query parameters
     /*let error_msg = match query {
         None => "".into(),
@@ -23,15 +26,22 @@ pub async fn login_form(request: HttpRequest) -> HttpResponse {
         },
     };*/
     // Use cookie
-    let error_msg = match request.cookie(LOGIN_ERROR_MSG) {
+    /*let error_msg = match request.cookie(LOGIN_ERROR_MSG) {
         None => "".into(),
         Some(cookie) => format!("<p><i>{}</i></p>", cookie.value()),
-    };
+    };*/
+
+    // Use Flash msg
+    let mut error_msg = String::new();
+    for msg in flash_msgs.iter().filter(|msg| msg.level() == Error) {
+        writeln!(error_msg, "<p><i>{}</i></p>", msg.content()).unwrap();
+    }
+
     let login_page = include_str!("login.html").replace("{}", &error_msg);
 
     // Response Headers:
     // set-cookie: login_error_msg=; Max-Age=0
-    let mut response = HttpResponse::Ok()
+    HttpResponse::Ok()
         .content_type(ContentType::html())
         // 等价于
         //.cookie(
@@ -39,14 +49,14 @@ pub async fn login_form(request: HttpRequest) -> HttpResponse {
         //        .max_age(Duration::ZERO)
         //        .finish(),
         //)
-        .body(login_page);
+        .body(login_page)
 
-    response
-        .add_removal_cookie(&Cookie::new(LOGIN_ERROR_MSG, ""))
-        .map_err(|e| {
-            trace!("Failed to add removal cookie: {:?}", e);
-        })
-        .unwrap();
+    /*response
+    .add_removal_cookie(&Cookie::new(LOGIN_ERROR_MSG, ""))
+    .map_err(|e| {
+        trace!("Failed to add removal cookie: {:?}", e);
+    })
+    .unwrap();
 
-    response
+    response*/
 }
