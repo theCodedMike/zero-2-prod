@@ -148,6 +148,22 @@ impl TestApp {
             .expect("Failed to get login html.")
     }
 
+    pub async fn get_admin_dashboard_html(&self) -> String {
+        self.get_admin_dashboard()
+            .await
+            .text()
+            .await
+            .expect("Failed to get admin dashboard.")
+    }
+
+    pub async fn get_admin_dashboard(&self) -> Response {
+        self.api_client
+            .get(&format!("{}/admin/dashboard", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
     /// Extract the confirmation links embedded in the request to the email API.
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
         // Parse the body as JSON, starting from raw bytes

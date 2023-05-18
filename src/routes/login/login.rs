@@ -1,11 +1,10 @@
 use crate::auth;
 use crate::auth::Credentials;
-// use crate::constant::LOGIN_ERROR_MSG;
 use crate::error::BizErrorEnum;
 use crate::request::LoginData;
+use crate::session_state::TypedSession;
 use crate::telemetry;
-// use actix_web::cookie::Cookie;
-use actix_web::http::header::LOCATION;
+use crate::util;
 use actix_web::{web, HttpResponse};
 use actix_web_flash_messages::FlashMessage;
 use sqlx::PgPool;
@@ -15,12 +14,13 @@ use sqlx::PgPool;
 ///       been altered by a third party
 #[tracing::instrument(
     name = "Login",
-    skip(form, pool),
+    skip(form, pool, session),
     fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
 )]
 pub async fn login(
     form: web::Form<LoginData>,
     pool: web::Data<PgPool>,
+    session: TypedSession,
 ) -> Result<HttpResponse, BizErrorEnum> {
     let credentials: Credentials = form.into_inner().into();
     telemetry::record_field("username", &credentials.username);
@@ -28,10 +28,14 @@ pub async fn login(
     match auth::validate_credentials(credentials, &pool).await {
         Ok(user_id) => {
             telemetry::record_field("user_id", &user_id);
-            // if login is successfully, redirect to the homepage; otherwise login again.
-            Ok(HttpResponse::SeeOther()
-                .insert_header((LOCATION, "/"))
-                .finish())
+            // Avoid session fixation attack
+            session.renew();
+            // If failed, redirect to login page
+            if let Err(error) = session.insert_user_id(user_id) {
+                return Ok(redirect_to_login_when_error(error));
+            };
+            // if login is successfully, redirect to the dashboard
+            Ok(util::redirect_to("/admin/dashboard"))
         }
         Err(error) => match error {
             // if username or password is wrong, login again.
@@ -59,15 +63,15 @@ pub async fn login(
                 // Response Headers:
                 // set-cookie: login_error_msg=Invalid username.
 
-                FlashMessage::error(error.to_string()).send();
-                Ok(HttpResponse::SeeOther()
-                    .insert_header((LOCATION, "/login"))
-                    //.insert_header(("Set-Cookie", format!("login_error_msg={}", error)))
-                    // 等价于
-                    //.cookie(Cookie::new(LOGIN_ERROR_MSG, error.to_string()))
-                    .finish())
+                Ok(redirect_to_login_when_error(error))
             }
             _ => Err(error),
         },
     }
+}
+
+/// Redirect to the login page with an error message.
+fn redirect_to_login_when_error(error: BizErrorEnum) -> HttpResponse {
+    FlashMessage::error(error.to_string()).send();
+    util::redirect_to("/login")
 }

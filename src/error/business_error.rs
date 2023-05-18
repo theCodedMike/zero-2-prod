@@ -136,6 +136,15 @@ pub enum BizErrorEnum {
     #[error("Failed to spawn blocking task.")]
     SpawnBlockingTaskError(#[source] tokio::task::JoinError),
 
+    #[error("Failed to build a redis session store")]
+    RedisSessionStoreBuildError(#[source] anyhow::Error),
+
+    #[error("Failed to insert key to session")]
+    ActixSessionInsertError(#[source] actix_session::SessionInsertError),
+
+    #[error("Failed to get key from session")]
+    ActixSessionGetError(#[source] actix_session::SessionGetError),
+
     // Argon
     #[error("Failed to parse hash in PHC string format.")]
     Argon2HashParseError(#[source] password_hash::Error),
@@ -204,7 +213,8 @@ impl ResponseError for BizErrorEnum {
             | BizErrorEnum::CredentialMissingUsername
             | BizErrorEnum::CredentialMissingPassword
             | BizErrorEnum::InvalidUsername
-            | BizErrorEnum::InvalidPassword(_) => {
+            | BizErrorEnum::InvalidPassword(_)
+            | BizErrorEnum::ActixSessionInsertError(_) => {
                 let mut response = HttpResponse::new(StatusCode::UNAUTHORIZED);
                 let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
 

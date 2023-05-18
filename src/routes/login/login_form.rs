@@ -1,10 +1,8 @@
-// use crate::constant::LOGIN_ERROR_MSG;
-// use actix_web::cookie::Cookie;
-use actix_web::http::header::ContentType;
 use actix_web::HttpResponse;
 use actix_web_flash_messages::IncomingFlashMessages;
 use actix_web_flash_messages::Level::Error;
 // use tracing_log::log::trace;
+use crate::util;
 use std::fmt::Write;
 
 #[tracing::instrument(name = "Get login page", skip(flash_msgs))]
@@ -38,25 +36,5 @@ pub async fn login_form(flash_msgs: IncomingFlashMessages) -> HttpResponse {
     }
 
     let login_page = include_str!("login.html").replace("{}", &error_msg);
-
-    // Response Headers:
-    // set-cookie: login_error_msg=; Max-Age=0
-    HttpResponse::Ok()
-        .content_type(ContentType::html())
-        // 等价于
-        //.cookie(
-        //    Cookie::build(LOGIN_ERROR_MSG, "")
-        //        .max_age(Duration::ZERO)
-        //        .finish(),
-        //)
-        .body(login_page)
-
-    /*response
-    .add_removal_cookie(&Cookie::new(LOGIN_ERROR_MSG, ""))
-    .map_err(|e| {
-        trace!("Failed to add removal cookie: {:?}", e);
-    })
-    .unwrap();
-
-    response*/
+    util::ok_to_return(login_page)
 }

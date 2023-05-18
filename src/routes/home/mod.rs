@@ -1,8 +1,7 @@
-use actix_web::http::header::ContentType;
+use crate::util;
 use actix_web::HttpResponse;
 
 pub async fn home() -> HttpResponse {
-    HttpResponse::Ok()
-        .content_type(ContentType::html())
-        .body(include_str!("home.html"))
+    let body = include_str!("home.html");
+    util::ok_to_return(body.into())
 }
