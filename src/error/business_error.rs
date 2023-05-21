@@ -1,7 +1,9 @@
+use crate::utils;
 use actix_web::body::BoxBody;
 use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
+use actix_web_flash_messages::FlashMessage;
 use argon2::password_hash;
 use std::fmt::{Debug, Formatter};
 
@@ -73,6 +75,9 @@ pub enum BizErrorEnum {
 
     #[error("Invalid password.")]
     InvalidPassword(#[source] password_hash::Error),
+
+    #[error("The user has not logged in")]
+    UserNotLoggedIn,
 
     // VALIDATE DATABASE ACCESS
     #[error("Subscription_token is invalid.")]
@@ -200,6 +205,11 @@ impl ResponseError for BizErrorEnum {
 
     fn error_response(&self) -> HttpResponse<BoxBody> {
         match self {
+            BizErrorEnum::UserNotLoggedIn => {
+                FlashMessage::error("You are not logged in, please log in before proceeding")
+                    .send();
+                utils::redirect_to("/login")
+            }
             BizErrorEnum::SubscriberNameIsEmpty
             | BizErrorEnum::SubscriberNameIsTooLong
             | BizErrorEnum::SubscriberNameContainsIllegalCharacter

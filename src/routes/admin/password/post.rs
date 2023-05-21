@@ -16,22 +16,14 @@ pub async fn change_password(
     pool: web::Data<PgPool>,
     session: TypedSession,
 ) -> Result<HttpResponse, BizErrorEnum> {
-    let password_data = form.into_inner();
+    // Verify if the user is logged in
+    let user_id = utils::validate_session(&session)?;
 
-    // Get user_id
-    let user_id = match session.get_user_id() {
-        Err(_) => return Ok(utils::redirect_to("/login")),
-        Ok(user_id) => match user_id {
-            None => return Ok(utils::redirect_to("/login")),
-            Some(user_id) => user_id,
-        },
-    };
     // Get username
-    let username = match routes::query_username(user_id, &pool).await {
-        Err(_) => return Ok(utils::redirect_to("/login")),
-        Ok(username) => username,
-    };
+    let username = routes::query_username(user_id, &pool).await?;
+
     // Validate current password is valid
+    let password_data = form.into_inner();
     let credentials = Credentials {
         username,
         password: password_data.current_password.clone(),

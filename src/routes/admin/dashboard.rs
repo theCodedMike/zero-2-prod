@@ -10,13 +10,11 @@ pub async fn admin_dashboard(
     session: TypedSession,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, BizErrorEnum> {
-    let username = if let Some(user_id) = session.get_user_id()? {
-        query_username(user_id, &pool).await?
-    } else {
-        // If a user tries to navigate directly to /admin/dashboard and they are not logged in,
-        // they will be redirected to the login form.
-        return Ok(utils::redirect_to("/login"));
-    };
+    // Verify if the user is logged in
+    let user_id = utils::validate_session(&session)?;
+
+    // Get username
+    let username = query_username(user_id, &pool).await?;
 
     let body = include_str!("dashboard.html").replace("{}", &username);
     Ok(utils::ok_to(body))

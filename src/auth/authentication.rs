@@ -18,7 +18,7 @@ use uuid::Uuid;
 pub async fn validate_credentials(
     credentials: Credentials,
     pool: &PgPool,
-) -> Result<uuid::Uuid, BizErrorEnum> {
+) -> Result<Uuid, BizErrorEnum> {
     // query user_id, password_hash from table
     let (user_id, password_hash_from_db) = get_stored_credentials(&credentials.username, pool)
         .await?
@@ -40,7 +40,7 @@ pub async fn validate_credentials(
 async fn get_stored_credentials(
     username: &str,
     pool: &PgPool,
-) -> Result<Option<(uuid::Uuid, Secret<String>)>, BizErrorEnum> {
+) -> Result<Option<(Uuid, Secret<String>)>, BizErrorEnum> {
     let row = sqlx::query!(
         r#"
         SELECT user_id, password_hash FROM users WHERE username = $1
