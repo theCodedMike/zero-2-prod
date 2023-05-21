@@ -10,7 +10,7 @@ pub fn redirect_to(location: &str) -> HttpResponse {
         .finish()
 }
 
-pub fn ok_to_return(body: String) -> HttpResponse {
+pub fn ok_to(body: String) -> HttpResponse {
     // Response Headers:
     // set-cookie: login_error_msg=; Max-Age=0
     /*response

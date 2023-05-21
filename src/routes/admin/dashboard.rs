@@ -1,6 +1,6 @@
 use crate::error::BizErrorEnum;
 use crate::session_state::TypedSession;
-use crate::util;
+use crate::utils;
 use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -15,15 +15,15 @@ pub async fn admin_dashboard(
     } else {
         // If a user tries to navigate directly to /admin/dashboard and they are not logged in,
         // they will be redirected to the login form.
-        return Ok(util::redirect_to("/login"));
+        return Ok(utils::redirect_to("/login"));
     };
 
     let body = include_str!("dashboard.html").replace("{}", &username);
-    Ok(util::ok_to_return(body))
+    Ok(utils::ok_to(body))
 }
 
 #[tracing::instrument(name = "Query username", skip(pool))]
-async fn query_username(user_id: Uuid, pool: &PgPool) -> Result<String, BizErrorEnum> {
+pub async fn query_username(user_id: Uuid, pool: &PgPool) -> Result<String, BizErrorEnum> {
     let record = sqlx::query!(
         r#"
             SELECT username FROM users WHERE user_id = $1

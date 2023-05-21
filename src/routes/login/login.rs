@@ -4,7 +4,7 @@ use crate::error::BizErrorEnum;
 use crate::request::LoginData;
 use crate::session_state::TypedSession;
 use crate::telemetry;
-use crate::util;
+use crate::utils;
 use actix_web::{web, HttpResponse};
 use actix_web_flash_messages::FlashMessage;
 use sqlx::PgPool;
@@ -35,7 +35,7 @@ pub async fn login(
                 return Ok(redirect_to_login_when_error(error));
             };
             // if login is successfully, redirect to the dashboard
-            Ok(util::redirect_to("/admin/dashboard"))
+            Ok(utils::redirect_to("/admin/dashboard"))
         }
         Err(error) => match error {
             // if username or password is wrong, login again.
@@ -71,7 +71,7 @@ pub async fn login(
 }
 
 /// Redirect to the login page with an error message.
-fn redirect_to_login_when_error(error: BizErrorEnum) -> HttpResponse {
+pub fn redirect_to_login_when_error(error: BizErrorEnum) -> HttpResponse {
     FlashMessage::error(error.to_string()).send();
-    util::redirect_to("/login")
+    utils::redirect_to("/login")
 }

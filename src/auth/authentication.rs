@@ -1,9 +1,11 @@
 use crate::auth::credentials::Credentials;
 use crate::error::BizErrorEnum;
 use crate::telemetry;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
+use uuid::Uuid;
 
 /// PHC string format:  
 /// ${algorithm}${algorithm version}${,-separated algorithm parameters}${hash}${salt}
@@ -66,7 +68,7 @@ fn verify_password_hash(
     password_hash_from_db: Secret<String>,
     password_from_user: Secret<String>,
 ) -> Result<(), BizErrorEnum> {
-    // parse hash in PHC string format
+    // Parse a password hash from a string in the PHC string format.
     let expected_password_hash = PasswordHash::new(&password_hash_from_db.expose_secret())
         .map_err(|e| BizErrorEnum::Argon2HashParseError(e))?;
     Argon2::default()
@@ -76,4 +78,39 @@ fn verify_password_hash(
         )
         .map_err(|e| BizErrorEnum::InvalidPassword(e))?;
     Ok(())
+}
+
+#[tracing::instrument(name = "Update new password", skip(new_password, pool))]
+pub async fn update_new_password(
+    user_id: Uuid,
+    new_password: Secret<String>,
+    pool: &PgPool,
+) -> Result<(), BizErrorEnum> {
+    let password_hash =
+        telemetry::spawn_blocking_with_tracing(move || compute_password_hash(new_password))
+            .await
+            .map_err(|e| BizErrorEnum::SpawnBlockingTaskError(e))??;
+
+    sqlx::query!(
+        r#"UPDATE users SET password_hash = $1 WHERE user_id = $2"#,
+        password_hash.expose_secret(),
+        user_id
+    )
+    .execute(pool)
+    .await
+    .map_err(|e| BizErrorEnum::UpdateUsersError(e))?;
+
+    Ok(())
+}
+
+#[tracing::instrument(name = "Compute password hash", skip(password))]
+fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, BizErrorEnum> {
+    let salt = SaltString::generate(&mut rand::thread_rng());
+
+    let password_hash = Argon2::default()
+        .hash_password(password.expose_secret().as_bytes(), &salt)
+        .map_err(|e| BizErrorEnum::Argon2HashPasswordError(e))?
+        .to_string();
+
+    Ok(Secret::new(password_hash))
 }

@@ -102,6 +102,9 @@ pub enum BizErrorEnum {
     #[error("Failed to query users.")]
     QueryUsersError(#[source] sqlx::Error),
 
+    #[error("Failed to update users.")]
+    UpdateUsersError(#[source] sqlx::Error),
+
     // OTHER
     #[error("Failed to send a confirmation email.")]
     SendEmailError(#[from] reqwest::Error),
@@ -157,6 +160,9 @@ pub enum BizErrorEnum {
 
     #[error("Failed to verify hmac tag")]
     HmacVerifySliceError(#[source] hmac::digest::MacError),
+
+    #[error("Failed to hash password")]
+    Argon2HashPasswordError(#[source] password_hash::Error),
 }
 
 impl Debug for BizErrorEnum {

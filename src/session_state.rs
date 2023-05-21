@@ -25,8 +25,12 @@ impl TypedSession {
             .get(SESSION_USER_ID)
             .map_err(|e| BizErrorEnum::ActixSessionGetError(e))
     }
+
+    pub fn log_out(&self) {
+        self.0.purge()
+    }
 }
-/// make TypedSession an actix-web extractor
+/// Make TypedSession as an actix-web extractor
 impl FromRequest for TypedSession {
     // This is a complicated way of saying
     // "We return the same error returned by the

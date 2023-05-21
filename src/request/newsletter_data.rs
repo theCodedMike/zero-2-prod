@@ -1,4 +1,4 @@
-use crate::util;
+use crate::utils;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -9,11 +9,11 @@ pub struct NewsletterData {
 
 impl NewsletterData {
     pub fn is_title_blank(&self) -> bool {
-        util::is_blank(&self.title)
+        utils::is_blank(&self.title)
     }
 
     pub fn is_content_blank(&self) -> bool {
-        util::is_blank(&self.content.html) || util::is_blank(&self.content.text)
+        utils::is_blank(&self.content.html) || utils::is_blank(&self.content.text)
     }
 }
 

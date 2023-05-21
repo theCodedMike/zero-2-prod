@@ -1,8 +1,6 @@
+use crate::utils;
 use actix_web::HttpResponse;
 use actix_web_flash_messages::IncomingFlashMessages;
-use actix_web_flash_messages::Level::Error;
-// use tracing_log::log::trace;
-use crate::util;
 use std::fmt::Write;
 
 #[tracing::instrument(name = "Get login page", skip(flash_msgs))]
@@ -31,10 +29,11 @@ pub async fn login_form(flash_msgs: IncomingFlashMessages) -> HttpResponse {
 
     // Use Flash msg
     let mut error_msg = String::new();
-    for msg in flash_msgs.iter().filter(|msg| msg.level() == Error) {
+    // Display all messages levels, not just errors!
+    for msg in flash_msgs.iter() {
         writeln!(error_msg, "<p><i>{}</i></p>", msg.content()).unwrap();
     }
 
     let login_page = include_str!("login.html").replace("{}", &error_msg);
-    util::ok_to_return(login_page)
+    utils::ok_to(login_page)
 }
