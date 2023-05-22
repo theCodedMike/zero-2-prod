@@ -115,13 +115,13 @@ impl TestApp {
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
         self.api_client
-            .post(&format!("{}/newsletters", &self.address))
+            .post(&format!("{}/newsletter", &self.address))
             // No longer randomly generated on the spot!
             .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
-            .expect("Failed to post newsletters.")
+            .expect("Failed to post newsletter.")
     }
 
     pub async fn post_login<Body>(&self, body: &Body) -> Response

@@ -4,7 +4,6 @@ use actix_web::body::MessageBody;
 use actix_web::dev::{ServiceRequest, ServiceResponse};
 use actix_web::error::InternalError;
 use actix_web::{FromRequest, HttpMessage};
-use actix_web_flash_messages::FlashMessage;
 use actix_web_lab::middleware::Next;
 use anyhow::anyhow;
 use std::fmt::{Debug, Display, Formatter};

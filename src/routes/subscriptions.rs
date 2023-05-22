@@ -11,7 +11,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 #[tracing::instrument(
-    name = "Adding a new subscriber",
+    name = "/subscriptions: Adding a new subscriber",
     skip(form, pool, email_client),
     fields(
         subscriber_email = %form.email,

@@ -9,7 +9,10 @@ use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use validator::HasLen;
 
-#[tracing::instrument(name = "Change password", skip(form, pool, user_id))]
+#[tracing::instrument(
+    name = "/admin/password: Handle change password",
+    skip(form, pool, user_id)
+)]
 pub async fn change_password(
     form: web::Form<ChangePasswordData>,
     pool: web::Data<PgPool>,

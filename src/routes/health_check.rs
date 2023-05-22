@@ -1,5 +1,6 @@
 use actix_web::HttpResponse;
 
+#[tracing::instrument(name = "/health_check: Health check")]
 pub async fn health_check() -> HttpResponse {
     HttpResponse::Ok().finish()
 }

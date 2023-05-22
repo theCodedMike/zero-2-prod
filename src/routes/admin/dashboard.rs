@@ -5,7 +5,7 @@ use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[tracing::instrument(name = "Get admin dashboard", skip(pool, user_id))]
+#[tracing::instrument(name = "/admin/dashboard: Get admin dashboard", skip(pool, user_id))]
 pub async fn admin_dashboard(
     user_id: web::ReqData<UserId>,
     pool: web::Data<PgPool>,

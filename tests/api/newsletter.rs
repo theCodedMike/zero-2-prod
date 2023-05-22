@@ -109,11 +109,11 @@ async fn newsletters_requests_missing_authorization_are_rejected() {
         }
     });
     let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
+        .post(&format!("{}/newsletter", &app.address))
         .json(&body)
         .send()
         .await
-        .expect("Failed to post newsletters.");
+        .expect("Failed to post newsletter.");
 
     // Assert
     assert_eq!(401, response.status().as_u16());
@@ -185,7 +185,7 @@ async fn newsletters_non_existing_user_is_rejected() {
     });
 
     let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
+        .post(&format!("{}/newsletter", &app.address))
         .basic_auth(username, Some(password))
         .json(&body)
         .send()
@@ -218,7 +218,7 @@ async fn newsletters_invalid_password_is_rejected() {
     });
 
     let response = reqwest::Client::new()
-        .post(&format!("{}/newsletters", &app.address))
+        .post(&format!("{}/newsletter", &app.address))
         .basic_auth(username, Some(password))
         .json(&body)
         .send()

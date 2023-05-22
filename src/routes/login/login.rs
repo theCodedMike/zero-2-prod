@@ -13,7 +13,7 @@ use sqlx::PgPool;
 /// role: verify that the query parameters have been set by our API and that they have not
 ///       been altered by a third party
 #[tracing::instrument(
-    name = "Login",
+    name = "/login: Handle login",
     skip(form, pool, session),
     fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
 )]

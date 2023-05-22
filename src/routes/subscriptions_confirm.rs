@@ -4,7 +4,10 @@ use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[tracing::instrument(name = "Confirm a pending subscriber", skip(confirm, pool))]
+#[tracing::instrument(
+    name = "/subscriptions/confirm: Confirm a pending subscriber",
+    skip(confirm, pool)
+)]
 pub async fn confirm(
     confirm: web::Query<ConfirmData>,
     pool: web::Data<PgPool>,

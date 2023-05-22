@@ -1,50 +1,56 @@
+use crate::auth::Credentials;
+use crate::auth::UserId;
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
 use crate::request::NewsletterData;
-use crate::telemetry;
-use crate::{auth, auth::Credentials};
+use crate::{routes, telemetry, utils};
 use actix_web::http::header::HeaderMap;
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{web, HttpResponse};
+use actix_web_flash_messages::FlashMessage;
 use base64::Engine;
 use secrecy::Secret;
 use sqlx::PgPool;
 
 #[tracing::instrument(
-    name = "Publish a newsletter issue",
-    skip(body, pool, email_client, request),
+    name = "/admin/newsletter: Publish a newsletter issue",
+    skip(body, pool, email_client, user_id),
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
-    body: web::Json<NewsletterData>,
+    body: web::Form<NewsletterData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
-    request: HttpRequest,
+    user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, BizErrorEnum> {
-    // get credential from headers
-    let credential = basic_authentication(request.headers())?;
-    telemetry::record_field("username", &credential.username);
-
-    // validate username and password
-    let user_id = auth::validate_credentials(credential, &pool).await?;
+    // Get user_id
+    let user_id = *user_id.into_inner();
     telemetry::record_field("user_id", &user_id);
+
+    // Get username
+    let username = routes::query_username(user_id, &pool).await?;
+    telemetry::record_field("username", username);
 
     // validate body
     let body_data = body.into_inner();
     if body_data.is_title_blank() {
-        tracing::error!("Newsletter's title is empty.");
-        return Err(BizErrorEnum::NewsletterTitleIsEmpty);
+        FlashMessage::error("Newsletter's title is blank.").send();
+        return Ok(utils::redirect_to("/admin/newsletter"));
     }
-    if body_data.is_content_blank() {
-        tracing::error!("Newsletter's content is empty.");
-        return Err(BizErrorEnum::NewsletterContentIsEmpty);
+    if body_data.is_html_blank() {
+        FlashMessage::error("Newsletter's html content is blank.").send();
+        return Ok(utils::redirect_to("/admin/newsletter"));
+    }
+    if body_data.is_text_blank() {
+        FlashMessage::error("Newsletter's text content is blank.").send();
+        return Ok(utils::redirect_to("/admin/newsletter"));
     }
 
     // get all confirmed subscriber's email
     let confirmed_emails = get_confirmed_subscribers(&pool).await?;
     if confirmed_emails.is_empty() {
-        tracing::info!("No confirmed subscribers.");
-        return Ok(HttpResponse::Ok().finish());
+        FlashMessage::info("No confirmed subscribers.").send();
+        return Ok(utils::redirect_to("/admin/newsletter"));
     }
 
     // send email
@@ -53,8 +59,8 @@ pub async fn publish_newsletter(
             .send_email(
                 &subscriber,
                 &body_data.title,
-                &body_data.content.html,
-                &body_data.content.text,
+                &body_data.html_content,
+                &body_data.text_content,
             )
             .await?;
     }

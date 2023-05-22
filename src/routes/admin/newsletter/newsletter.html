@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"  http-equiv="content-type" content="text/html">
+    <title>Publish a  newsletter issue</title>
+</head>
+<body>
+    {}
+    <form action="/admin/newsletter" method="post">
+        <label>
+            Title
+            <input
+                    type="text"
+                    placeholder="Enter title"
+                    name="title"
+            >
+        </label>
+        <br>
+        <label>
+            Html Content
+            <input
+                    type="text"
+                    placeholder="Enter html content"
+                    name="html_content"
+            >
+        </label>
+        <br>
+        <label>
+            Text Content
+            <input
+                    type="text"
+                    placeholder="Enter text content"
+                    name="text_content"
+            >
+        </label>
+        <br>
+        <button type="submit">Publish Now</button>
+    </form>
+    <p><a href="/admin/dashboard">&lt;- Back</a></p>
+</body>
+</html>

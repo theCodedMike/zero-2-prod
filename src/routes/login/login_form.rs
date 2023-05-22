@@ -3,7 +3,7 @@ use actix_web::HttpResponse;
 use actix_web_flash_messages::IncomingFlashMessages;
 use std::fmt::Write;
 
-#[tracing::instrument(name = "Get login page", skip(flash_msgs))]
+#[tracing::instrument(name = "/login: Get login page", skip(flash_msgs))]
 pub async fn login_form(flash_msgs: IncomingFlashMessages) -> HttpResponse {
     // HMAC to verify integrity and provenance for our query parameters
     /*let error_msg = match query {

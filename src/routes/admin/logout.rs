@@ -4,7 +4,7 @@ use crate::utils;
 use actix_web::HttpResponse;
 use actix_web_flash_messages::FlashMessage;
 
-#[tracing::instrument(name = "Logout", skip(session))]
+#[tracing::instrument(name = "/admin/logout: Logout", skip(session))]
 pub async fn log_out(session: TypedSession) -> Result<HttpResponse, BizErrorEnum> {
     // Verify if the user is logged in
 

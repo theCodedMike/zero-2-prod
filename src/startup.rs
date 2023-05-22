@@ -137,6 +137,11 @@ async fn run(
                     .route("/dashboard", web::get().to(routes::admin_dashboard))
                     .route("/password", web::get().to(routes::change_password_form))
                     .route("/password", web::post().to(routes::change_password))
+                    .route(
+                        "/newsletter",
+                        web::get().to(routes::publish_newsletter_form),
+                    )
+                    .route("/newsletter", web::post().to(routes::publish_newsletter))
                     .route("/logout", web::post().to(routes::log_out)),
             )
             .route("/login", web::get().to(routes::login_form))
@@ -144,7 +149,6 @@ async fn run(
             .route("/health_check", web::get().to(routes::health_check))
             .route("/subscriptions", web::post().to(routes::subscribe))
             .route("/subscriptions/confirm", web::get().to(routes::confirm))
-            .route("/newsletters", web::post().to(routes::publish_newsletter))
     })
     .listen(listener)
     .map_err(|e| {

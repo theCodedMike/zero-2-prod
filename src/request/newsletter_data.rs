@@ -4,7 +4,8 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct NewsletterData {
     pub title: String,
-    pub content: Content,
+    pub text_content: String,
+    pub html_content: String,
 }
 
 impl NewsletterData {
@@ -12,13 +13,11 @@ impl NewsletterData {
         utils::is_blank(&self.title)
     }
 
-    pub fn is_content_blank(&self) -> bool {
-        utils::is_blank(&self.content.html) || utils::is_blank(&self.content.text)
+    pub fn is_html_blank(&self) -> bool {
+        utils::is_blank(&self.html_content)
     }
-}
 
-#[derive(Deserialize)]
-pub struct Content {
-    pub html: String,
-    pub text: String,
+    pub fn is_text_blank(&self) -> bool {
+        utils::is_blank(&self.text_content)
+    }
 }
