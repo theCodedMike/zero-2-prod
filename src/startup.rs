@@ -1,7 +1,7 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
-use crate::routes;
+use crate::{auth, routes};
 use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
 use actix_web::cookie::Key;
@@ -129,13 +129,16 @@ async fn run(
             .app_data(app_base_url.clone())
             .app_data(web::Data::new(HmacSecret(hmac_secret.clone())))
             .route("/", web::get().to(routes::home))
-            .route("/admin/dashboard", web::get().to(routes::admin_dashboard))
-            .route(
-                "/admin/password",
-                web::get().to(routes::change_password_form),
+            .service(
+                web::scope("/admin")
+                    .wrap(actix_web_lab::middleware::from_fn(
+                        auth::reject_anonymous_users,
+                    ))
+                    .route("/dashboard", web::get().to(routes::admin_dashboard))
+                    .route("/password", web::get().to(routes::change_password_form))
+                    .route("/password", web::post().to(routes::change_password))
+                    .route("/logout", web::post().to(routes::log_out)),
             )
-            .route("/admin/password", web::post().to(routes::change_password))
-            .route("/admin/logout", web::post().to(routes::log_out))
             .route("/login", web::get().to(routes::login_form))
             .route("/login", web::post().to(routes::login))
             .route("/health_check", web::get().to(routes::health_check))

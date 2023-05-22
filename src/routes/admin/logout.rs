@@ -7,7 +7,6 @@ use actix_web_flash_messages::FlashMessage;
 #[tracing::instrument(name = "Logout", skip(session))]
 pub async fn log_out(session: TypedSession) -> Result<HttpResponse, BizErrorEnum> {
     // Verify if the user is logged in
-    let _user_id = utils::validate_session(&session)?;
 
     session.log_out();
 

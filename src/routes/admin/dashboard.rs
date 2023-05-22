@@ -1,17 +1,17 @@
+use crate::auth::UserId;
 use crate::error::BizErrorEnum;
-use crate::session_state::TypedSession;
 use crate::utils;
 use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[tracing::instrument(name = "Get admin dashboard", skip(pool, session))]
+#[tracing::instrument(name = "Get admin dashboard", skip(pool, user_id))]
 pub async fn admin_dashboard(
-    session: TypedSession,
+    user_id: web::ReqData<UserId>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, BizErrorEnum> {
     // Verify if the user is logged in
-    let user_id = utils::validate_session(&session)?;
+    let user_id = *user_id.into_inner();
 
     // Get username
     let username = query_username(user_id, &pool).await?;

@@ -120,7 +120,7 @@ async fn the_length_of_new_password_must_be_appropriate() {
     // Act - Part 3 - Follow the redirect
     let html_page = app.get_change_password_html().await;
     assert!(html_page
-        .contains("<p><i>The length of new password must >= 12 && <= 128 characters.</i></p>"));
+        .contains("<p><i>The length of new password must >= 6 && <= 128 characters.</i></p>"));
 }
 
 #[tokio::test]

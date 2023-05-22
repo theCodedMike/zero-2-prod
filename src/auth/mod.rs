@@ -1,5 +1,7 @@
-mod authentication;
 mod credentials;
+mod middleware;
+mod password;
 
-pub use authentication::*;
 pub use credentials::*;
+pub use middleware::*;
+pub use password::*;

@@ -79,6 +79,12 @@ pub enum BizErrorEnum {
     #[error("The user has not logged in")]
     UserNotLoggedIn,
 
+    #[error("Failed to extract session from HttpRequest")]
+    SessionExtractError,
+
+    #[error("Failed to call next service")]
+    ServiceCallError,
+
     // VALIDATE DATABASE ACCESS
     #[error("Subscription_token is invalid.")]
     SubscriptionTokenInvalidError,

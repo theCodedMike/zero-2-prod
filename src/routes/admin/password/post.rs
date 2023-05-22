@@ -1,8 +1,7 @@
-use crate::auth::Credentials;
+use crate::auth::{Credentials, UserId};
 use crate::error::BizErrorEnum;
 use crate::request::ChangePasswordData;
 use crate::routes;
-use crate::session_state::TypedSession;
 use crate::{auth, utils};
 use actix_web::{web, HttpResponse};
 use actix_web_flash_messages::FlashMessage;
@@ -10,14 +9,15 @@ use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use validator::HasLen;
 
-#[tracing::instrument(name = "Change password", skip(form, pool, session))]
+#[tracing::instrument(name = "Change password", skip(form, pool, user_id))]
 pub async fn change_password(
     form: web::Form<ChangePasswordData>,
     pool: web::Data<PgPool>,
-    session: TypedSession,
+    // No longer injecting TypedSession!
+    user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, BizErrorEnum> {
     // Verify if the user is logged in
-    let user_id = utils::validate_session(&session)?;
+    let user_id = *user_id.into_inner();
 
     // Get username
     let username = routes::query_username(user_id, &pool).await?;
