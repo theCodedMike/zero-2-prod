@@ -49,7 +49,7 @@ pub async fn publish_newsletter(
     // get all confirmed subscriber's email
     let confirmed_emails = get_confirmed_subscribers(&pool).await?;
     if confirmed_emails.is_empty() {
-        FlashMessage::info("No confirmed subscribers.").send();
+        FlashMessage::info("No confirmed subscribers!!!").send();
         return Ok(utils::redirect_to("/admin/newsletter"));
     }
 
@@ -64,7 +64,8 @@ pub async fn publish_newsletter(
             )
             .await?;
     }
-    Ok(HttpResponse::Ok().finish())
+    FlashMessage::info("The newsletter issue has been published!").send();
+    Ok(utils::redirect_to("/admin/newsletter"))
 }
 
 #[tracing::instrument(name = "Query confirmed subscribers", skip(pool))]

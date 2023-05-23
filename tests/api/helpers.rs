@@ -113,15 +113,32 @@ impl TestApp {
             .expect("Failed to get health_check.")
     }
 
-    pub async fn post_newsletters(&self, body: serde_json::Value) -> Response {
+    pub async fn post_newsletter<Body>(&self, body: &Body) -> Response
+    where
+        Body: serde::Serialize,
+    {
         self.api_client
-            .post(&format!("{}/newsletter", &self.address))
-            // No longer randomly generated on the spot!
-            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
-            .json(&body)
+            .post(&format!("{}/admin/newsletter", &self.address))
+            .form(&body)
             .send()
             .await
             .expect("Failed to post newsletter.")
+    }
+
+    pub async fn get_newsletter(&self) -> Response {
+        self.api_client
+            .get(&format!("{}/admin/newsletter", &self.address))
+            .send()
+            .await
+            .expect("Failed to get newsletter.")
+    }
+
+    pub async fn get_newsletter_html(&self) -> String {
+        self.get_newsletter()
+            .await
+            .text()
+            .await
+            .expect("Failed to get newsletter html.")
     }
 
     pub async fn post_login<Body>(&self, body: &Body) -> Response
@@ -281,6 +298,14 @@ impl TestUser {
             username: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
         }
+    }
+
+    pub async fn login(&self, app: &TestApp) {
+        let body = serde_json::json!({
+            "username": &self.username,
+            "password": &self.password
+        });
+        app.post_login(&body).await;
     }
 
     async fn store(&self, pool: &PgPool) {
