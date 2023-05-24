@@ -3,8 +3,9 @@ use crate::auth::UserId;
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
+use crate::idempotency::IdempotencyKey;
 use crate::request::NewsletterData;
-use crate::{routes, telemetry, utils};
+use crate::{idempotency, routes, telemetry, utils};
 use actix_web::http::header::HeaderMap;
 use actix_web::{web, HttpResponse};
 use actix_web_flash_messages::FlashMessage;
@@ -15,7 +16,7 @@ use sqlx::PgPool;
 #[tracing::instrument(
     name = "/admin/newsletter: Publish a newsletter issue",
     skip(body, pool, email_client, user_id),
-    fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
+    fields(user_id=tracing::field::Empty)
 )]
 pub async fn publish_newsletter(
     body: web::Form<NewsletterData>,
@@ -27,11 +28,7 @@ pub async fn publish_newsletter(
     let user_id = *user_id.into_inner();
     telemetry::record_field("user_id", &user_id);
 
-    // Get username
-    let username = routes::query_username(user_id, &pool).await?;
-    telemetry::record_field("username", username);
-
-    // validate body
+    // Validate newsletter's body
     let body_data = body.into_inner();
     if body_data.is_title_blank() {
         FlashMessage::error("Newsletter's title is blank.").send();
@@ -45,15 +42,24 @@ pub async fn publish_newsletter(
         FlashMessage::error("Newsletter's text content is blank.").send();
         return Ok(utils::redirect_to("/admin/newsletter"));
     }
+    let idempotency_key: IdempotencyKey = body_data.idempotency_key.try_into()?;
 
-    // get all confirmed subscriber's email
+    // Return early if we have a saved response in the database
+    if let Some(saved_response) =
+        idempotency::get_saved_response(&pool, &idempotency_key, user_id).await?
+    {
+        FlashMessage::info("The newsletter issue has been published!").send();
+        return Ok(saved_response);
+    }
+
+    // Get all confirmed subscriber's email
     let confirmed_emails = get_confirmed_subscribers(&pool).await?;
     if confirmed_emails.is_empty() {
         FlashMessage::info("No confirmed subscribers!!!").send();
         return Ok(utils::redirect_to("/admin/newsletter"));
     }
 
-    // send email
+    // Send email
     for subscriber in confirmed_emails {
         email_client
             .send_email(
@@ -64,8 +70,13 @@ pub async fn publish_newsletter(
             )
             .await?;
     }
+
+    // Make response
     FlashMessage::info("The newsletter issue has been published!").send();
-    Ok(utils::redirect_to("/admin/newsletter"))
+    let response = utils::redirect_to("/admin/newsletter");
+    let http_response =
+        idempotency::save_response(&pool, user_id, &idempotency_key, response).await?;
+    Ok(http_response)
 }
 
 #[tracing::instrument(name = "Query confirmed subscribers", skip(pool))]

@@ -48,6 +48,16 @@ pub enum BizErrorEnum {
     #[error("Url join path error.")]
     JoinUrlError,
 
+    // VALIDATE IDEMPOTENCY KEY
+    #[error("The idempotency key cannot be empty.")]
+    IdempotencyKeyIsBlank,
+
+    #[error("The idempotency key is too short, length should >= 10 && <= 50.")]
+    IdempotencyKeyIsTooShort,
+
+    #[error("The idempotency key is too long, length should >= 10 && <= 50.")]
+    IdempotencyKeyIsTooLong,
+
     // VALIDATE AUTH
     #[error("The 'Authorization' header was missing.")]
     AuthorizationHeaderIsMissing,
@@ -116,6 +126,12 @@ pub enum BizErrorEnum {
     #[error("Failed to update users.")]
     UpdateUsersError(#[source] sqlx::Error),
 
+    #[error("Failed to query idempotency.")]
+    QueryIdempotencyError(#[source] sqlx::Error),
+
+    #[error("Failed to insert idempotency.")]
+    InsertIdempotencyError(#[source] sqlx::Error),
+
     // OTHER
     #[error("Failed to send a confirmation email.")]
     SendEmailError(#[from] reqwest::Error),
@@ -158,6 +174,15 @@ pub enum BizErrorEnum {
 
     #[error("Failed to get key from session")]
     ActixSessionGetError(#[source] actix_session::SessionGetError),
+
+    #[error("Failed to convert response status code.")]
+    ResponseStatusCodeTryIntoError(#[source] std::num::TryFromIntError),
+
+    #[error("Failed to convert status code.")]
+    StatusCodeConvertError,
+
+    #[error("Failed to convert body to bytes.")]
+    HttpResponseBodyToBytesError,
 
     // Argon
     #[error("Failed to parse hash in PHC string format.")]
@@ -225,7 +250,10 @@ impl ResponseError for BizErrorEnum {
             | BizErrorEnum::SubscriberEmailMissDomain
             | BizErrorEnum::SubscriberEmailFormatIsIncorrect
             | BizErrorEnum::NewsletterTitleIsEmpty
-            | BizErrorEnum::NewsletterContentIsEmpty => HttpResponse::new(StatusCode::BAD_REQUEST),
+            | BizErrorEnum::NewsletterContentIsEmpty
+            | BizErrorEnum::IdempotencyKeyIsBlank
+            | BizErrorEnum::IdempotencyKeyIsTooShort
+            | BizErrorEnum::IdempotencyKeyIsTooLong => HttpResponse::new(StatusCode::BAD_REQUEST),
 
             BizErrorEnum::AuthorizationHeaderIsMissing
             | BizErrorEnum::AuthorizationHeaderIsInvalidUtf8String(_)

@@ -4,6 +4,7 @@ pub mod constant;
 pub mod domain;
 pub mod email_client;
 pub mod error;
+pub mod idempotency;
 pub mod request;
 pub mod routes;
 pub mod session_state;

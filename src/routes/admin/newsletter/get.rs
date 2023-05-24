@@ -3,6 +3,7 @@ use crate::utils;
 use actix_web::HttpResponse;
 use actix_web_flash_messages::IncomingFlashMessages;
 use std::fmt::Write;
+use uuid::Uuid;
 
 #[tracing::instrument(name = "/admin/newsletter: Get newsletter form", skip(flash_msgs))]
 pub async fn publish_newsletter_form(
@@ -14,6 +15,9 @@ pub async fn publish_newsletter_form(
     for msg in flash_msgs.iter() {
         writeln!(msg_html, "<p><i>{}</i></p>", msg.content()).unwrap();
     }
-    let body = include_str!("newsletter.html").replace("{}", &msg_html);
+    let idempotency_key = Uuid::new_v4().to_string();
+    let body = include_str!("newsletter.html")
+        .replace("{}", &msg_html)
+        .replace("<>", &idempotency_key);
     Ok(utils::ok_to(body))
 }
