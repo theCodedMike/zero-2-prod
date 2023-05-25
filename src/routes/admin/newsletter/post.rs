@@ -3,9 +3,9 @@ use crate::auth::UserId;
 use crate::domain::SubscriberEmail;
 use crate::email_client::EmailClient;
 use crate::error::BizErrorEnum;
-use crate::idempotency::IdempotencyKey;
+use crate::idempotency::{IdempotencyKey, NextAction};
 use crate::request::NewsletterData;
-use crate::{idempotency, routes, telemetry, utils};
+use crate::{idempotency, telemetry, utils};
 use actix_web::http::header::HeaderMap;
 use actix_web::{web, HttpResponse};
 use actix_web_flash_messages::FlashMessage;
@@ -27,10 +27,20 @@ pub async fn publish_newsletter(
     // Get user_id
     let user_id = *user_id.into_inner();
     telemetry::record_field("user_id", &user_id);
-
-    // Validate newsletter's body
     let body_data = body.into_inner();
-    if body_data.is_title_blank() {
+    let idempotency_key: IdempotencyKey = body_data.idempotency_key.try_into()?;
+
+    // Return early if we have a saved response in the database
+    let transaction = match idempotency::try_processing(&pool, &idempotency_key, user_id).await? {
+        NextAction::StartProcessing(t) => t,
+        NextAction::ReturnSavedResponse(saved_response) => {
+            FlashMessage::info("The newsletter issue has been published!").send();
+            return Ok(saved_response);
+        }
+    };
+
+    // Validate newsletter's body 可以放在前端校验
+    /*if body_data.is_title_blank() {
         FlashMessage::error("Newsletter's title is blank.").send();
         return Ok(utils::redirect_to("/admin/newsletter"));
     }
@@ -41,16 +51,7 @@ pub async fn publish_newsletter(
     if body_data.is_text_blank() {
         FlashMessage::error("Newsletter's text content is blank.").send();
         return Ok(utils::redirect_to("/admin/newsletter"));
-    }
-    let idempotency_key: IdempotencyKey = body_data.idempotency_key.try_into()?;
-
-    // Return early if we have a saved response in the database
-    if let Some(saved_response) =
-        idempotency::get_saved_response(&pool, &idempotency_key, user_id).await?
-    {
-        FlashMessage::info("The newsletter issue has been published!").send();
-        return Ok(saved_response);
-    }
+    }*/
 
     // Get all confirmed subscriber's email
     let confirmed_emails = get_confirmed_subscribers(&pool).await?;
@@ -75,7 +76,7 @@ pub async fn publish_newsletter(
     FlashMessage::info("The newsletter issue has been published!").send();
     let response = utils::redirect_to("/admin/newsletter");
     let http_response =
-        idempotency::save_response(&pool, user_id, &idempotency_key, response).await?;
+        idempotency::update_response(transaction, user_id, &idempotency_key, response).await?;
     Ok(http_response)
 }
 

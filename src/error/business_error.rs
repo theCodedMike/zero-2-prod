@@ -132,6 +132,9 @@ pub enum BizErrorEnum {
     #[error("Failed to insert idempotency.")]
     InsertIdempotencyError(#[source] sqlx::Error),
 
+    #[error("We expected a saved record, we didn't find it")]
+    FindExpectedSavedRecordError,
+
     // OTHER
     #[error("Failed to send a confirmation email.")]
     SendEmailError(#[from] reqwest::Error),
