@@ -10,9 +10,4 @@ database:
   database_name: "newsletter"
   require_ssl: false
 email_client:
-  base_url: "https://example.net"
-  sender_email: "test@gmail.com"
-  # We are only setting the development value,
-  # we'll deal with the production token outside of version control
-  authorization_token: "my-secret-token"
   timeout_milliseconds: 10000

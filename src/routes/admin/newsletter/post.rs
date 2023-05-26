@@ -47,43 +47,12 @@ pub async fn publish_newsletter(
             }
         };
 
-    // Validate newsletter's body 可以放在前端校验
-    /*if body_data.is_title_blank() {
-        FlashMessage::error("Newsletter's title is blank.").send();
-        return Ok(utils::redirect_to("/admin/newsletter"));
-    }
-    if body_data.is_html_blank() {
-        FlashMessage::error("Newsletter's html content is blank.").send();
-        return Ok(utils::redirect_to("/admin/newsletter"));
-    }
-    if body_data.is_text_blank() {
-        FlashMessage::error("Newsletter's text content is blank.").send();
-        return Ok(utils::redirect_to("/admin/newsletter"));
-    }*/
-
+    // Save title and content
     let issue_id =
         insert_newsletter_issue(&mut transaction, &title, &text_content, &html_content).await?;
 
+    // Gen delivery task
     enqueue_delivery_tasks(&mut transaction, issue_id).await?;
-
-    // Get all confirmed subscriber's email
-    /*let confirmed_emails = get_confirmed_subscribers(&pool).await?;
-    if confirmed_emails.is_empty() {
-        FlashMessage::info("No confirmed subscribers!!!").send();
-        return Ok(utils::redirect_to("/admin/newsletter"));
-    }*/
-
-    // Send email
-    /*for subscriber in confirmed_emails {
-        email_client
-            .send_email(
-                &subscriber,
-                &body_data.title,
-                &body_data.html_content,
-                &body_data.text_content,
-            )
-            .await?;
-    }*/
 
     // Make response
     let response = utils::redirect_to("/admin/newsletter");

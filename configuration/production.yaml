@@ -4,8 +4,8 @@ application:
   base_url: "http://0.0.0.0"
 database:
   host: "postgres"
-  # 真实的生产环境时需设置为true
-  require_ssl: false
+  require_ssl: false # 生产环境时需设置为true
 email_client:
   base_url: "https://api.postmarkapp.com"
   sender_email: "something@gmail.com"
+  authorization_token: "my-secret-token"
