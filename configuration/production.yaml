@@ -1,5 +1,7 @@
+redis_uri: "redis://redis:6379"
 application:
   host: "0.0.0.0"
+  base_url: "http://0.0.0.0"
 database:
   host: "postgres"
   # 真实的生产环境时需设置为true

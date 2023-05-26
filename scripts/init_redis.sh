@@ -15,6 +15,6 @@ docker run \
     -p "6379:6379" \
     -d \
     --name "redis_$(date '+%s')" \
-    redis:latest
+    redis:7.0
 
 >&2 echo "Redis is ready to go!"

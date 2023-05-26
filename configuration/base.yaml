@@ -1,4 +1,3 @@
-redis_uri: "redis://127.0.0.1:6379"
 application:
   port: 8000
   # You need to set the `APP_APPLICATION__HMAC_SECRET` environment variable

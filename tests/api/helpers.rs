@@ -6,9 +6,11 @@ use reqwest::{Response, Url};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
-use zero_2_prod::configuration;
 use zero_2_prod::configuration::DatabaseSettings;
+use zero_2_prod::email_client::EmailClient;
+use zero_2_prod::issue_delivery_worker::ExecutionOutcome;
 use zero_2_prod::telemetry;
+use zero_2_prod::{configuration, issue_delivery_worker};
 use zero_2_prod::{startup, startup::Application};
 
 // Ensure that the `tracing` stack is only initialised once using `once_cell`
@@ -28,6 +30,7 @@ pub struct TestApp {
     pub address: String,
     pub connect_pool: PgPool,
     pub email_server: MockServer,
+    pub email_client: EmailClient,
     pub port: u16,
     pub test_user: TestUser,
     pub api_client: reqwest::Client,
@@ -87,12 +90,25 @@ impl TestApp {
             address: format!("http://127.0.0.1:{}", app_port),
             connect_pool: startup::get_connection_pool(&configuration.database),
             email_server,
+            email_client: configuration.email_client.client(),
             port: app_port,
             test_user: TestUser::new(),
             api_client: client,
         };
         test_app.test_user.store(&test_app.connect_pool).await;
         test_app
+    }
+
+    pub async fn dispatch_all_pending_emails(&self) {
+        loop {
+            if let ExecutionOutcome::EmptyQueue =
+                issue_delivery_worker::try_execute_task(&self.connect_pool, &self.email_client)
+                    .await
+                    .unwrap()
+            {
+                break;
+            }
+        }
     }
 
     pub async fn post_subscriptions(&self, body: String) -> Response {

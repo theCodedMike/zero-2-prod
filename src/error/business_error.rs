@@ -135,6 +135,21 @@ pub enum BizErrorEnum {
     #[error("We expected a saved record, we didn't find it")]
     FindExpectedSavedRecordError,
 
+    #[error("Failed to insert newsletter_issues.")]
+    InsertNewsletterIssuesError(#[source] sqlx::Error),
+
+    #[error("Failed to query newsletter_issues.")]
+    QueryNewsletterIssuesError(#[source] sqlx::Error),
+
+    #[error("Failed to insert issue_delivery_queue.")]
+    InsertIssueDeliveryQueueError(#[source] sqlx::Error),
+
+    #[error("Failed to query issue_delivery_queue.")]
+    QueryIssueDeliveryQueueError(#[source] sqlx::Error),
+
+    #[error("Failed to delete record from issue_delivery_queue.")]
+    DeleteIssueDeliveryQueueError(#[source] sqlx::Error),
+
     // OTHER
     #[error("Failed to send a confirmation email.")]
     SendEmailError(#[from] reqwest::Error),

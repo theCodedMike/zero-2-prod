@@ -28,14 +28,7 @@ impl Application {
         let pg_pool = get_connection_pool(&config.database);
 
         // Build an `EmailClient` using `configuration`
-        let sender_email = config.email_client.sender()?;
-        let timeout = config.email_client.timeout();
-        let email_client = EmailClient::new(
-            config.email_client.base_url,
-            sender_email,
-            config.email_client.authorization_token,
-            timeout,
-        );
+        let email_client = config.email_client.client();
 
         // We have removed the hard-coded `8000` - it's now coming from our settings!
         // 0.0.0.0 as host to instruct our application to accept connections from any network interface,

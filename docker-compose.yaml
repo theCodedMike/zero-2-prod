@@ -1,5 +1,13 @@
 version: '3'
 services:
+  redis:
+    image: redis:7.0
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - server-side
+
   postgres:
     container_name: postgres
     restart: always
